@@ -1,0 +1,15 @@
+#!/bin/sh
+# ----------------------------------------------------------------------------
+# Maven Wrapper startup script for UN*X
+# ----------------------------------------------------------------------------
+
+BASEDIR=$(dirname "$0")
+JAVA_EXE="$(/usr/libexec/java_home 2>/dev/null)/bin/java"
+if [ ! -x "$JAVA_EXE" ]; then
+  JAVA_EXE="java"
+fi
+
+WRAPPER_JAR="$BASEDIR/.mvn/wrapper/maven-wrapper.jar"
+WRAPPER_MAIN="org.apache.maven.wrapper.MavenWrapperMain"
+
+exec "$JAVA_EXE" -classpath "$WRAPPER_JAR" $WRAPPER_MAIN "$@"
