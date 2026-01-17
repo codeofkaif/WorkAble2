@@ -6,6 +6,7 @@ interface AccessibilityState {
   keyboardOnly: boolean;
   voiceCommands: boolean;
   screenReader: boolean;
+  language: 'en' | 'hi'; // English or Hindi
 }
 
 interface AccessibilityContextType {
@@ -17,6 +18,8 @@ interface AccessibilityContextType {
   toggleKeyboardOnly: () => void;
   toggleVoiceCommands: () => void;
   toggleScreenReader: () => void;
+  setLanguage: (lang: 'en' | 'hi') => void;
+  toggleLanguage: () => void;
 }
 
 const AccessibilityContext = createContext<AccessibilityContextType | undefined>(undefined);
@@ -46,6 +49,7 @@ export const AccessibilityProvider: React.FC<AccessibilityProviderProps> = ({ ch
       keyboardOnly: false,
       voiceCommands: false,
       screenReader: true,
+      language: 'en', // Default to English
     };
   });
 
@@ -99,6 +103,20 @@ export const AccessibilityProvider: React.FC<AccessibilityProviderProps> = ({ ch
     setState(prev => ({ ...prev, screenReader: !prev.screenReader }));
   };
 
+  const setLanguage = (lang: 'en' | 'hi') => {
+    setState(prev => ({ ...prev, language: lang }));
+    // Set HTML lang attribute for screen readers
+    document.documentElement.lang = lang;
+  };
+
+  const toggleLanguage = () => {
+    setState(prev => {
+      const newLang = prev.language === 'en' ? 'hi' : 'en';
+      document.documentElement.lang = newLang;
+      return { ...prev, language: newLang };
+    });
+  };
+
   const value: AccessibilityContextType = {
     state,
     toggleHighContrast,
@@ -108,6 +126,8 @@ export const AccessibilityProvider: React.FC<AccessibilityProviderProps> = ({ ch
     toggleKeyboardOnly,
     toggleVoiceCommands,
     toggleScreenReader,
+    setLanguage,
+    toggleLanguage,
   };
 
   return (

@@ -14,6 +14,7 @@ const Register: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [disabilityType, setDisabilityType] = useState('none');
+  const [role, setRole] = useState<'job_seeker' | 'employer'>('job_seeker');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register, isAuthenticated } = useAuth();
@@ -45,13 +46,14 @@ const Register: React.FC = () => {
     setLoading(true);
 
     try {
-      // Call register with phone if provided
+      // Call register with phone and role if provided
       const response = await api.post('/auth/register', {
         name,
         email,
         password,
         disabilityType,
-        phone: phone || undefined
+        phone: phone || undefined,
+        role
       });
       
       if (response.data.status === 'success' && response.data.token) {
@@ -148,6 +150,23 @@ const Register: React.FC = () => {
                 <p className="mt-1 text-xs text-gray-500">
                   Optional: Add phone number for password recovery via SMS
                 </p>
+              </div>
+
+              <div>
+                <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
+                  I am a
+                </label>
+                <select
+                  id="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as 'job_seeker' | 'employer')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  disabled={loading}
+                  required
+                >
+                  <option value="job_seeker">Job Seeker</option>
+                  <option value="employer">Employer</option>
+                </select>
               </div>
 
               <div>

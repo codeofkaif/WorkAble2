@@ -56,11 +56,15 @@ src/
 ### **Prerequisites**
 - Node.js 16+ 
 - npm or yarn
+- **Backend:** Node.js backend (`backend/`) OR Spring Boot backend (`backend-java/`) running on port 5001
 
 ### **Installation**
 ```bash
 # Install dependencies
 npm install
+
+# Create .env file (if not exists)
+echo "REACT_APP_API_URL=http://localhost:5001/api" > .env
 
 # Start development server
 npm start
@@ -74,6 +78,13 @@ npm test
 
 ### **Development Server**
 The application will be available at `http://localhost:3000`
+
+### **Backend Compatibility**
+✅ This frontend works with **both backend options**:
+- **Node.js Backend** (`backend/`) - Original backend
+- **Spring Boot Backend** (`backend-java/`) - Enterprise migration (100% API compatible)
+
+No frontend changes required! Both backends expose the same API endpoints on port 5001.
 
 ## 🎯 **Available Routes**
 

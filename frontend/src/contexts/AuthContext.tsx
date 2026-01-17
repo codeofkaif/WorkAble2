@@ -11,6 +11,7 @@ interface User {
   preferences?: any;
   profileCompleted?: boolean;
   avatar?: string;
+  role?: 'job_seeker' | 'employer';
 }
 
 interface AuthContextType {

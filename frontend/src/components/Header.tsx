@@ -56,8 +56,8 @@ const Header: React.FC = () => {
                 aria-label="Emergency contacts"
               >
                 <Phone className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Emergency: 112</span>
-                <span className="sm:hidden">112</span>
+                <span className="hidden sm:inline">Emergency: 108</span>
+                <span className="sm:hidden">108</span>
               </button>
             </div>
           </div>

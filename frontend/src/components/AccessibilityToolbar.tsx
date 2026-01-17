@@ -14,7 +14,8 @@ import {
   Accessibility,
   ZoomIn,
   ZoomOut,
-  RotateCcw
+  RotateCcw,
+  Languages
 } from 'lucide-react';
 import { useAccessibility } from '../contexts/AccessibilityContext';
 import { useVoiceCommands } from '../hooks/useVoiceCommands';
@@ -30,6 +31,7 @@ const AccessibilityToolbar: React.FC = () => {
     toggleKeyboardOnly,
     toggleVoiceCommands,
     toggleScreenReader,
+    toggleLanguage,
   } = useAccessibility();
 
   const [isExpanded, setIsExpanded] = React.useState(false);
@@ -192,6 +194,19 @@ const AccessibilityToolbar: React.FC = () => {
                   <Keyboard className="w-4 h-4 mr-2" />
                   <span className="hidden sm:inline">{state.keyboardOnly ? 'Keyboard Only ON' : 'Keyboard Only OFF'}</span>
                   <span className="sm:hidden">{state.keyboardOnly ? 'Keyboard ON' : 'Keyboard OFF'}</span>
+                </Button>
+
+                {/* Language Toggle */}
+                <Button
+                  onClick={toggleLanguage}
+                  variant="outline"
+                  size="sm"
+                  className="w-full transition-all duration-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700"
+                  aria-label={`Switch language to ${state.language === 'en' ? 'Hindi' : 'English'}`}
+                >
+                  <Languages className="w-4 h-4 mr-2" />
+                  <span className="hidden sm:inline">{state.language === 'en' ? 'English → हिंदी' : 'हिंदी → English'}</span>
+                  <span className="sm:hidden">{state.language === 'en' ? 'EN → HI' : 'HI → EN'}</span>
                 </Button>
               </div>
 

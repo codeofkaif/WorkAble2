@@ -27,11 +27,19 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ai-job-ac
 const userRoutes = require('./routes/userRoutes');
 const authRoutes = require('./routes/authRoutes');
 const resumeRoutes = require('./routes/resumeRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const skillsApiRoutes = require('./routes/skillsApiRoutes');
+const jobRoutes = require('./routes/jobRoutes');
+const applicationRoutes = require('./routes/applicationRoutes');
 
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/resume', resumeRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/jobs', jobRoutes);
+app.use('/api/applications', applicationRoutes);
+app.use('/api', skillsApiRoutes); // Skills API routes (jobs/autocomplete, skills/autocomplete, etc.)
 
 // Health check route
 app.get('/api/health', (req, res) => {

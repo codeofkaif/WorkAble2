@@ -9,7 +9,7 @@ const smsService = require('../services/smsService');
 // Register user
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, disabilityType, phone } = req.body;
+    const { name, email, password, disabilityType, phone, role } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
@@ -34,7 +34,8 @@ router.post('/register', async (req, res) => {
       email,
       password,
       disabilityType: disabilityType || 'none',
-      phone: phone || undefined
+      phone: phone || undefined,
+      role: role || 'job_seeker' // Default to job_seeker if not specified
     });
 
     await user.save();

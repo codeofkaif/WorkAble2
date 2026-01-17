@@ -34,6 +34,8 @@ A comprehensive resume builder integrated into the AI Job Accessibility platform
 ## 🛠️ Technical Implementation
 
 ### Backend Architecture
+
+**Node.js Backend** (`backend/`):
 ```
 backend/
 ├── models/
@@ -46,6 +48,27 @@ backend/
 └── server.js              # Main server with resume routes
 ```
 
+**Spring Boot Backend** (`backend-java/`) - **NEW!**:
+```
+backend-java/
+├── src/main/java/com/ai/accessibility/
+│   ├── controller/
+│   │   └── ResumeController.java    # REST endpoints
+│   ├── service/
+│   │   ├── ResumeService.java       # Business logic
+│   │   └── AIResumeService.java     # Gemini AI integration
+│   ├── model/
+│   │   └── Resume.java              # MongoDB entity
+│   ├── repository/
+│   │   └── ResumeRepository.java   # Data access
+│   └── security/
+│       └── JwtUtil.java             # JWT handling
+└── src/main/resources/
+    └── application.yml              # Configuration
+```
+
+**Note:** Both backends expose the same API endpoints and are 100% compatible!
+
 ### Frontend Components
 ```
 frontend/src/
@@ -57,25 +80,40 @@ frontend/src/
     └── index.ts           # TypeScript interfaces
 ```
 
-### API Endpoints
-- `POST /api/resume` - Create new resume
-- `GET /api/resume` - Get user's resumes
-- `GET /api/resume/:id` - Get specific resume
-- `PUT /api/resume/:id` - Update resume
-- `DELETE /api/resume/:id` - Delete resume
-- `POST /api/resume/generate` - AI resume generation
-- `GET /api/resume/:id/pdf` - Download PDF
-- `POST /api/resume/voice` - Voice processing
+### API Endpoints (Both Backends)
+
+Both Node.js and Spring Boot backends expose identical endpoints:
+
+- `POST /api/resume` - Create new resume (JWT protected)
+- `GET /api/resume` - Get user's resumes (JWT protected)
+- `GET /api/resume/:id` - Get specific resume (JWT protected)
+- `PUT /api/resume/:id` - Update resume (JWT protected)
+- `DELETE /api/resume/:id` - Delete resume (JWT protected)
+- `POST /api/resume/generate` - AI resume generation (JWT protected)
+- `POST /api/resume/upload` - Upload resume file
+- `GET /api/resume/:id/pdf` - Download PDF (Node.js only, coming to Spring Boot)
+
+**Note:** All endpoints return the same JSON format and are 100% compatible between backends!
 
 ## 🚀 Getting Started
 
 ### Prerequisites
+
+**For Node.js Backend:**
 - Node.js (v16 or higher)
 - MongoDB instance
-- OpenAI API key
+- Gemini API key (Google Generative AI)
 - npm or yarn
 
+**For Spring Boot Backend:**
+- Java 17+
+- Maven 3.6+
+- MongoDB instance (same as Node.js)
+- Gemini API key (same as Node.js)
+
 ### Backend Setup
+
+#### Option 1: Node.js Backend
 
 1. **Install Dependencies**
    ```bash
@@ -91,7 +129,7 @@ frontend/src/
 
 3. **Required Environment Variables**
    ```env
-   OPENAI_API_KEY=your-openai-api-key
+   GEMINI_API_KEY=your-gemini-api-key
    JWT_SECRET=your-jwt-secret
    MONGODB_URI=your-mongodb-connection-string
    ```
@@ -100,6 +138,31 @@ frontend/src/
    ```bash
    npm start
    ```
+
+#### Option 2: Spring Boot Backend (Enterprise)
+
+1. **Build Project**
+   ```bash
+   cd backend-java
+   mvn clean package
+   ```
+
+2. **Set Environment Variables**
+   ```bash
+   export MONGODB_URI="your-mongodb-connection-string"
+   export JWT_SECRET="your-jwt-secret"
+   export GEMINI_API_KEY="your-gemini-api-key"
+   export PORT=5001
+   ```
+
+3. **Start Server**
+   ```bash
+   mvn spring-boot:run
+   # OR
+   java -jar target/accessibility-0.0.1-SNAPSHOT.jar
+   ```
+
+**Note:** Both backends use the same MongoDB database and API endpoints. Frontend works with either backend without any changes!
 
 ### Frontend Setup
 
@@ -177,9 +240,10 @@ frontend/src/
 ### Common Issues
 
 1. **AI Generation Fails**
-   - Check OpenAI API key configuration
+   - Check Gemini API key configuration (`GEMINI_API_KEY`)
    - Verify internet connection
    - Ensure prompt is detailed enough
+   - For Spring Boot: Check `application.yml` or environment variables
 
 2. **Voice Input Not Working**
    - Check browser permissions for microphone

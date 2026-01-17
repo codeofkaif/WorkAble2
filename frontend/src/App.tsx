@@ -15,6 +15,8 @@ import Footer from './components/Footer';
 import Contact from './components/Contact';
 import JobRecommendationEngine from './components/JobRecommendationEngine';
 import SearchResults from './components/SearchResults';
+import UserProfile from './components/UserProfile';
+import Dashboard from './components/Dashboard';
 
 function App() {
   return (
@@ -38,9 +40,7 @@ function App() {
                   path="/dashboard"
                   element={
                     <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                        <h1 className="text-3xl font-bold text-gray-700">Dashboard - Coming Soon</h1>
-                      </div>
+                      <Dashboard />
                     </ProtectedRoute>
                   }
                 />
@@ -64,9 +64,7 @@ function App() {
                   path="/profile"
                   element={
                     <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                        <h1 className="text-3xl font-bold text-gray-700">Profile - Coming Soon</h1>
-                      </div>
+                      <UserProfile />
                     </ProtectedRoute>
                   }
                 />
