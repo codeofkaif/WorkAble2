@@ -4,7 +4,7 @@ server:
 spring:
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/ai-job-accessibility}
+      uri: mongodb+srv://kaif6388:KAIFkhan6388@cluster0.rxnir.mongodb.net/ai-job-accessibility?retryWrites=true&w=majority&appName=Cluster0
   servlet:
     multipart:
       max-file-size: 10MB
@@ -12,9 +12,9 @@ spring:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:change_me}
+    secret: Kaifkhan638891@&
   gemini:
-    api-key: ${GEMINI_API_KEY:}
+    api-key: ${GEMINI_API_KEY:AIzaSyClsioS040Ydo1xE35FHvssQbN24CNr9f8}
   env: ${SPRING_PROFILES_ACTIVE:development}
 
 logging:

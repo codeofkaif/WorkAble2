@@ -15,13 +15,41 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ai-job-accessibility')
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ai-job-accessibility';
+
+mongoose.connect(MONGODB_URI, {
+  serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+  socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+})
   .then(() => {
     console.log('✅ Connected to MongoDB successfully');
+    console.log(`📊 Database: ${mongoose.connection.db.databaseName}`);
+    console.log(`🔗 Connection URI: ${MONGODB_URI.replace(/:[^:@]+@/, ':****@')}`); // Hide password
   })
   .catch((error) => {
-    console.error('❌ MongoDB connection error:', error);
+    console.error('❌ MongoDB connection error:', error.message);
+    console.error('💡 Please check your MONGODB_URI in config.env');
   });
+
+// MongoDB Connection Event Listeners
+mongoose.connection.on('connected', () => {
+  console.log('🟢 Mongoose connected to MongoDB');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('🔴 Mongoose connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('🟡 Mongoose disconnected from MongoDB');
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  await mongoose.connection.close();
+  console.log('MongoDB connection closed through app termination');
+  process.exit(0);
+});
 
 // Import routes
 const userRoutes = require('./routes/userRoutes');

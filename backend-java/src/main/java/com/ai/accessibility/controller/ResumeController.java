@@ -116,17 +116,30 @@ public class ResumeController {
             response.put("message", "AI-generated resume created successfully");
             
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
                 "status", "error",
                 "message", e.getMessage()
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                "status", "error",
-                "message", "Failed to generate AI resume",
-                "error", "development".equals(environment) ? e.getMessage() : "Internal server error"
-            ));
+            String errorMessage = "Failed to generate AI resume";
+            String errorDetail = null;
+            
+            if ("development".equals(environment)) {
+                errorDetail = e.getMessage();
+                if (e.getCause() != null) {
+                    errorDetail += " | Cause: " + e.getCause().getMessage();
+                }
+            }
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", errorMessage);
+            if (errorDetail != null) {
+                errorResponse.put("error", errorDetail);
+            }
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
     

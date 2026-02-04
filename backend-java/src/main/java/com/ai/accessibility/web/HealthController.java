@@ -15,17 +15,17 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/health")
 public class HealthController {
-    
+
     @Value("${app.env:development}")
     private String environment;
-    
+
     @GetMapping
     public ResponseEntity<Map<String, Object>> health() {
         return ResponseEntity.ok(Map.of(
-            "status", "success",
+                "status", "success",
             "message", "AI Job Accessibility API is running",
-            "timestamp", Instant.now().toString(),
-            "environment", environment
+                "timestamp", Instant.now().toString(),
+                "environment", environment
         ));
     }
 }

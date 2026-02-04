@@ -2,12 +2,15 @@ package com.ai.accessibility.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +22,8 @@ import java.util.regex.Pattern;
  */
 @Service
 public class AIResumeService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(AIResumeService.class);
     
     @Value("${app.gemini.api-key}")
     private String geminiApiKey;
@@ -43,41 +48,87 @@ public class AIResumeService {
             throw new IllegalArgumentException("Prompt is required for AI generation");
         }
         
+        // Validate API key
+        if (geminiApiKey == null || geminiApiKey.trim().isEmpty()) {
+            throw new IllegalStateException("GEMINI_API_KEY is not configured. Please set the environment variable or update application.yml");
+        }
+        
         // Build Gemini prompt - matches Node.js prompt exactly
         String geminiPrompt = buildGeminiPrompt(prompt);
         
-        // Prepare request body
+        // Prepare request body - Gemini REST API format
         Map<String, Object> requestBody = new HashMap<>();
-        Map<String, Object> contents = new HashMap<>();
         Map<String, Object> part = new HashMap<>();
         part.put("text", geminiPrompt);
         
         Map<String, Object> content = new HashMap<>();
         content.put("parts", java.util.List.of(part));
-        contents.put("contents", java.util.List.of(content));
         
-        requestBody.putAll(contents);
+        requestBody.put("contents", java.util.List.of(content));
         
         // Call Gemini API
         String url = GEMINI_API_BASE + "?key=" + geminiApiKey;
+        
+        logger.info("Calling Gemini API: {}", GEMINI_API_BASE);
+        logger.debug("Request body size: {} chars", geminiPrompt.length());
+        logger.debug("API Key present: {}", geminiApiKey != null && !geminiApiKey.isEmpty());
         
         try {
             String response = webClient.post()
                     .uri(url)
                     .body(BodyInserters.fromValue(requestBody))
                     .retrieve()
+                    .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(), 
+                        clientResponse -> {
+                            logger.error("Gemini API HTTP error: {}", clientResponse.statusCode());
+                            return clientResponse.bodyToMono(String.class)
+                                .doOnNext(body -> logger.error("Error response body: {}", body))
+                                .then(Mono.error(new RuntimeException("Gemini API returned error: " + clientResponse.statusCode())));
+                        })
                     .bodyToMono(String.class)
                     .block();
             
+            logger.debug("Gemini API response received: {} chars", response != null ? response.length() : 0);
+            
+            if (response == null || response.trim().isEmpty()) {
+                throw new RuntimeException("Empty response from Gemini API");
+            }
+            
             // Parse response
-            JsonNode jsonResponse = objectMapper.readTree(response);
+            JsonNode jsonResponse;
+            try {
+                jsonResponse = objectMapper.readTree(response);
+            } catch (Exception parseError) {
+                logger.error("Failed to parse Gemini response as JSON: {}", response.substring(0, Math.min(500, response.length())));
+                throw new RuntimeException("Invalid JSON response from Gemini API: " + parseError.getMessage(), parseError);
+            }
+            
+            // Check for errors in response
+            if (jsonResponse.has("error")) {
+                JsonNode errorNode = jsonResponse.get("error");
+                String errorMessage = errorNode.has("message") 
+                    ? errorNode.get("message").asText() 
+                    : "Unknown error from Gemini API";
+                String errorCode = errorNode.has("code") 
+                    ? errorNode.get("code").asText() 
+                    : "UNKNOWN";
+                logger.error("Gemini API error: {} (code: {})", errorMessage, errorCode);
+                throw new RuntimeException("Gemini API error: " + errorMessage + " (code: " + errorCode + ")");
+            }
+            
             String extractedContent = extractContentFromResponse(jsonResponse);
+            
+            if (extractedContent == null || extractedContent.trim().isEmpty()) {
+                throw new RuntimeException("No content extracted from Gemini response");
+            }
             
             // Parse JSON from response
             Map<String, Object> aiGeneratedData = parseJsonFromContent(extractedContent);
             
             return aiGeneratedData;
             
+        } catch (RuntimeException e) {
+            throw e; // Re-throw runtime exceptions as-is
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate AI resume: " + e.getMessage(), e);
         }

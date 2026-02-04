@@ -180,11 +180,11 @@ Front-end specific environment variables (e.g., `REACT_APP_API_URL`) can be adde
    npm run dev                        # use nodemon if configured, else node server.js
    ```
 2. **Frontend**
-   ```zsh
+```zsh
    cd frontend
-   npm install
-   npm start
-   ```
+npm install
+npm start
+```
 
 ### Option 2: Spring Boot Backend (Enterprise Migration) — **NEW!**
 1. **Backend**
