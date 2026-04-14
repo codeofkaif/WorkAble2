@@ -256,6 +256,35 @@ npm start
 
 ---
 
+## Deploy (Render)
+
+This repo is now deployment-ready for Render using the included `render.yaml`.
+
+### 1) Push code to GitHub
+- Commit and push this repository.
+
+### 2) Create Render Blueprint
+- In Render dashboard, choose **New +** -> **Blueprint**.
+- Connect your GitHub repo.
+- Render will read `render.yaml` and create:
+  - `ai-job-accessibility-backend` (Node web service)
+  - `ai-job-accessibility-frontend` (static site)
+
+### 3) Set required backend env vars in Render
+- `MONGODB_URI`
+- `JWT_SECRET`
+- `GEMINI_API_KEY`
+
+### 4) Verify health
+- Backend health: `/api/health`
+- Frontend should call backend via `REACT_APP_API_URL`
+
+### Env templates
+- Backend template: `backend/config.env.example`
+- Frontend template: `frontend/.env.example`
+
+---
+
 ## 11. Backend Migration Status
 
 ✅ **Spring Boot Backend Migration Complete!**

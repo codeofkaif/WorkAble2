@@ -14,6 +14,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Avoid Mongoose query buffering timeout errors; fail fast when DB is down.
+mongoose.set('bufferCommands', false);
+
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ai-job-accessibility';
 
@@ -61,6 +64,22 @@ const jobRoutes = require('./routes/jobRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 
 // Routes
+app.use('/api', (req, res, next) => {
+  // Allow health route even when DB is down
+  if (req.path === '/health') {
+    return next();
+  }
+
+  // 1 = connected. Anything else means queries will fail.
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      status: 'error',
+      message: 'Database is not connected. Please check MongoDB/Internet and try again.'
+    });
+  }
+  return next();
+});
+
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/resume', resumeRoutes);
