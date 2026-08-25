@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileText, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Clipboard, X, Loader2, CheckCircle2, AlertCircle, Sparkles, UserCheck } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Button } from './ui/button';
+import { Textarea } from './ui/textarea';
 import { resumeAPI } from '../services/resumeAPI';
 
 interface ResumeUploadProps {
@@ -10,11 +11,13 @@ interface ResumeUploadProps {
 }
 
 const ResumeUpload: React.FC<ResumeUploadProps> = ({ onFileExtracted }) => {
+  const [activeTab, setActiveTab] = useState<'upload' | 'paste'>('paste');
   const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
+  const [pastedText, setPastedText] = useState('');
+  const [syncProfile, setSyncProfile] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const acceptedFormats = ['.pdf', '.docx', '.txt'];
@@ -24,14 +27,12 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onFileExtracted }) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    // Validate file type
     const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
     if (!acceptedFormats.includes(fileExtension)) {
       setError(`Please upload a file in one of these formats: ${acceptedFormats.join(', ')}`);
       return;
     }
 
-    // Validate file size
     if (selectedFile.size > maxFileSize) {
       setError('File size must be less than 10MB');
       return;
@@ -39,65 +40,60 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onFileExtracted }) => {
 
     setFile(selectedFile);
     setError(null);
-    setSuccess(false);
+    setSuccessMessage(null);
   };
 
-  const handleUpload = async () => {
+  const handleUploadFile = async () => {
     if (!file) return;
 
-    setIsUploading(true);
-    setIsExtracting(true);
+    setIsProcessing(true);
     setError(null);
-    setSuccess(false);
+    setSuccessMessage(null);
 
     try {
-      // Call backend API to extract text from resume
       const extractedData = await resumeAPI.uploadResume(file);
-
-      // Auto-fill resume fields with extracted data
       if (extractedData && onFileExtracted) {
         onFileExtracted(extractedData);
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+        setSuccessMessage('Resume extracted successfully! Form, Preview & Profile have been updated.');
+        setTimeout(() => setSuccessMessage(null), 5000);
       }
     } catch (err: any) {
       console.error('Upload error:', err);
-      
-      // Better error handling
-      let errorMessage = 'Failed to extract text from resume. Please try again.';
-      
-      if (err.response) {
-        // Server responded with error
-        errorMessage = err.response.data?.message || err.response.data?.error || errorMessage;
-        
-        if (err.response.status === 401) {
-          errorMessage = 'Authentication required. Please login first.';
-        } else if (err.response.status === 403) {
-          errorMessage = 'Permission denied. Please check your access.';
-        } else if (err.response.status === 413) {
-          errorMessage = 'File too large. Please upload a file smaller than 10MB.';
-        } else if (err.response.status === 500) {
-          errorMessage = 'Server error. Please try again later or contact support.';
-        }
-      } else if (err.request) {
-        // Request made but no response
-        errorMessage = 'Network error. Please check your internet connection and ensure the backend server is running.';
-      } else {
-        // Error in request setup
-        errorMessage = err.message || errorMessage;
-      }
-      
-      setError(errorMessage);
+      setError(err.message || 'Failed to extract text from resume file. Try pasting the text directly in the Paste Text tab.');
     } finally {
-      setIsUploading(false);
-      setIsExtracting(false);
+      setIsProcessing(false);
     }
   };
 
-  const handleRemove = () => {
+  const handleParseText = async () => {
+    if (!pastedText.trim()) {
+      setError('Please paste your resume text before proceeding.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const extractedData = await resumeAPI.parseText(pastedText, syncProfile, 'modern');
+      if (extractedData && onFileExtracted) {
+        onFileExtracted(extractedData);
+        setSuccessMessage('Resume text parsed successfully! Form, Live Preview & Profile are ready.');
+        setTimeout(() => setSuccessMessage(null), 5000);
+      }
+    } catch (err: any) {
+      console.error('Parse text error:', err);
+      setError(err.message || 'Failed to parse resume text. Please check the text and try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRemoveFile = () => {
     setFile(null);
     setError(null);
-    setSuccess(false);
+    setSuccessMessage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -112,135 +108,203 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onFileExtracted }) => {
         setFile(droppedFile);
         setError(null);
       } else {
-        setError(`Please upload a file in one of these formats: ${acceptedFormats.join(', ')} and less than 10MB`);
+        setError(`Please upload a file in one of these formats: ${acceptedFormats.join(', ')} (Max 10MB)`);
       }
     }
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  };
-
   return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2 text-lg">
-          <Upload className="w-5 h-5 text-blue-600" />
-          <span>Upload Your Resume</span>
-        </CardTitle>
-        <CardDescription>
-          Upload a PDF, DOCX, or TXT file to auto-fill your resume fields
-        </CardDescription>
+    <Card className="mb-6 border-navy-100 shadow-sm overflow-hidden">
+      <CardHeader className="bg-gradient-to-r from-blue-50/50 via-white to-purple-50/50 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center space-x-2 text-lg font-bold text-gray-900">
+              <Sparkles className="w-5 h-5 text-blue-600" />
+              <span>Instant Resume & Profile Builder</span>
+            </CardTitle>
+            <CardDescription className="text-gray-600 mt-1">
+              Paste your resume text or upload a file to auto-populate your Resume and User Profile in 1-click.
+            </CardDescription>
+          </div>
+
+          {/* Mode Switcher Tabs */}
+          <div className="inline-flex rounded-lg bg-gray-100 p-1 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => { setActiveTab('paste'); setError(null); }}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                activeTab === 'paste'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Clipboard className="w-3.5 h-3.5" />
+              <span>Paste Text</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('upload'); setError(null); }}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                activeTab === 'upload'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload PDF/DOCX</span>
+            </button>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
-        <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-colors hover:border-blue-400 focus-within:border-blue-500"
-        >
+
+      <CardContent className="pt-4 space-y-4">
+        {/* Profile Auto-Sync Toggle */}
+        <div className="flex items-center justify-between p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-sm">
+          <div className="flex items-center space-x-2">
+            <UserCheck className="w-4 h-4 text-blue-600 flex-shrink-0" />
+            <span className="text-gray-700 font-medium">Auto-sync skills & details to my User Profile</span>
+          </div>
           <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.docx,.txt"
-            onChange={handleFileSelect}
-            className="hidden"
-            id="resume-upload"
-            aria-label="Upload resume file"
+            type="checkbox"
+            id="syncProfileCheckbox"
+            checked={syncProfile}
+            onChange={(e) => setSyncProfile(e.target.checked)}
+            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
           />
-          
-          {!file ? (
-            <label
-              htmlFor="resume-upload"
-              className="cursor-pointer flex flex-col items-center space-y-4"
-            >
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <Upload className="w-8 h-8 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-gray-700 font-medium">
-                  Drag and drop your resume here, or{' '}
-                  <span className="text-blue-600 hover:text-blue-700 underline">
-                    browse
-                  </span>
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  Supports PDF, DOCX, TXT (Max 10MB)
-                </p>
-              </div>
-            </label>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
-            >
-              <div className="flex items-center justify-center space-x-3">
-                <FileText className="w-8 h-8 text-blue-600" />
-                <div className="flex-1 text-left">
-                  <p className="font-medium text-gray-900">{file.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {(file.size / 1024).toFixed(2)} KB
-                  </p>
-                </div>
-                <button
-                  onClick={handleRemove}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  aria-label="Remove file"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-              
-              <Button
-                onClick={handleUpload}
-                disabled={isUploading || isExtracting}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {isUploading || isExtracting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Extracting text...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Extract & Auto-fill
-                  </>
-                )}
-              </Button>
-            </motion.div>
-          )}
         </div>
 
-        {/* Loading Skeleton */}
-        <AnimatePresence>
-          {isExtracting && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-4 space-y-3"
+        {/* Tab 1: Paste Text Mode */}
+        {activeTab === 'paste' && (
+          <div className="space-y-3">
+            <Textarea
+              rows={6}
+              value={pastedText}
+              onChange={(e) => setPastedText(e.target.value)}
+              placeholder="Paste your raw resume text here (Name, Summary, Skills, Experience, Education, Projects)..."
+              className="w-full font-mono text-xs sm:text-sm bg-gray-50/50 focus:bg-white border-gray-200 resize-y"
+            />
+            <div className="flex justify-between items-center text-xs text-gray-500">
+              <span>{pastedText.length} characters</span>
+              {pastedText && (
+                <button
+                  type="button"
+                  onClick={() => setPastedText('')}
+                  className="text-red-500 hover:underline"
+                >
+                  Clear text
+                </button>
+              )}
+            </div>
+            <Button
+              onClick={handleParseText}
+              disabled={isProcessing || !pastedText.trim()}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2.5 shadow-md"
             >
-              <div className="h-4 bg-gray-200 rounded animate-pulse" />
-              <div className="h-4 bg-gray-200 rounded animate-pulse w-5/6" />
-              <div className="h-4 bg-gray-200 rounded animate-pulse w-4/6" />
-            </motion.div>
-          )}
-        </AnimatePresence>
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Building Resume & Profile with AI...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Build Resume & Profile in 1-Click
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Tab 2: Upload File Mode */}
+        {activeTab === 'upload' && (
+          <div
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center transition-colors hover:border-blue-400 focus-within:border-blue-500 bg-gray-50/30"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="resume-upload-input"
+              aria-label="Upload resume file"
+            />
+
+            {!file ? (
+              <label
+                htmlFor="resume-upload-input"
+                className="cursor-pointer flex flex-col items-center space-y-3"
+              >
+                <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Upload className="w-7 h-7 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-gray-700 font-medium text-sm">
+                    Drag and drop your resume, or{' '}
+                    <span className="text-blue-600 hover:text-blue-700 underline font-semibold">
+                      browse files
+                    </span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Supports PDF, DOCX, TXT (Max 10MB)
+                  </p>
+                </div>
+              </label>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center space-x-3 bg-white p-3 rounded-lg border border-gray-200">
+                  <FileText className="w-8 h-8 text-blue-600" />
+                  <div className="flex-1 text-left">
+                    <p className="font-medium text-gray-900 text-sm">{file.name}</p>
+                    <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                  </div>
+                  <button
+                    onClick={handleRemoveFile}
+                    className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                    aria-label="Remove file"
+                  >
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+
+                <Button
+                  onClick={handleUploadFile}
+                  disabled={isProcessing}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Extracting & Syncing Profile...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Extract & Auto-fill
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Success Message */}
         <AnimatePresence>
-          {success && (
+          {successMessage && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center space-x-2"
+              className="p-3.5 bg-green-50 border border-green-200 rounded-xl flex items-start space-x-2.5 text-sm text-green-800"
             >
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-              <p className="text-sm text-green-800">
-                Resume extracted successfully! Fields have been auto-filled.
-              </p>
+              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-green-900">Success!</p>
+                <p>{successMessage}</p>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -252,10 +316,13 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onFileExtracted }) => {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2"
+              className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-2.5 text-sm text-red-800"
             >
-              <AlertCircle className="w-5 h-5 text-red-600" />
-              <p className="text-sm text-red-800">{error}</p>
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-red-900">Notice</p>
+                <p>{error}</p>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -265,4 +332,3 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onFileExtracted }) => {
 };
 
 export default ResumeUpload;
-

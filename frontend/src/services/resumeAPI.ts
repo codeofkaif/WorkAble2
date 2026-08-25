@@ -149,5 +149,32 @@ export const resumeAPI = {
         throw error;
       }
     }
+  },
+
+  // Parse raw text and extract structured resume data
+  parseText: async (text: string, syncProfile: boolean = true, template: string = 'modern'): Promise<ResumeData> => {
+    try {
+      const response = await api.post('/resume/parse-text', {
+        text,
+        syncProfile,
+        template
+      });
+      
+      if (response.data.status === 'success' && response.data.data) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to parse resume text');
+      }
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data?.message || error.response.data?.error || 'Failed to parse resume text');
+      } else if (error.request) {
+        throw new Error('Network error: Could not connect to backend.');
+      } else {
+        throw error;
+      }
+    }
   }
 };
+
+

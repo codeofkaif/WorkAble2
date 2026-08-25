@@ -29,9 +29,23 @@ const ResumeBuilder: React.FC = () => {
 
   const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classic' | 'creative' | 'minimal'>('modern');
 
-  // Handle file extraction from upload
+  // Handle file extraction from upload or paste
   const handleFileExtracted = (extractedData: any) => {
     if (!extractedData) return;
+
+    let technicalSkills: string[] = [];
+    let softSkills: string[] = [];
+    if (Array.isArray(extractedData.skills)) {
+      technicalSkills = extractedData.skills;
+    } else if (extractedData.skills && typeof extractedData.skills === 'object') {
+      technicalSkills = Array.isArray(extractedData.skills.technical) ? extractedData.skills.technical : [];
+      softSkills = Array.isArray(extractedData.skills.soft) ? extractedData.skills.soft : [];
+    }
+
+    const newTemplate = extractedData.template || selectedTemplate || 'modern';
+    if (extractedData.template) {
+      setSelectedTemplate(extractedData.template);
+    }
 
     setResumeData(prev => ({
       ...prev,
@@ -51,8 +65,8 @@ const ResumeBuilder: React.FC = () => {
         ? extractedData.education
         : prev.education,
       skills: {
-        technical: extractedData.skills?.technical || prev.skills?.technical || [],
-        soft: extractedData.skills?.soft || prev.skills?.soft || []
+        technical: technicalSkills.length > 0 ? technicalSkills : prev.skills?.technical || [],
+        soft: softSkills.length > 0 ? softSkills : prev.skills?.soft || []
       },
       projects: (extractedData.projects && extractedData.projects.length > 0)
         ? extractedData.projects
@@ -60,7 +74,7 @@ const ResumeBuilder: React.FC = () => {
       certifications: (extractedData.certifications && extractedData.certifications.length > 0)
         ? extractedData.certifications
         : prev.certifications,
-      template: prev.template || 'modern'
+      template: newTemplate
     }));
   };
 

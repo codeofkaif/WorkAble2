@@ -1,6 +1,8 @@
 package com.ai.accessibility.controller;
 
+import com.ai.accessibility.entity.UserEntity;
 import com.ai.accessibility.model.Resume;
+import com.ai.accessibility.repository.jpa.UserJpaRepository;
 import com.ai.accessibility.service.AIResumeService;
 import com.ai.accessibility.service.ContextEngineClient;
 import com.ai.accessibility.service.ResumeService;
@@ -27,6 +29,9 @@ public class ResumeController {
 
     @Autowired
     private ContextEngineClient contextEngineClient;
+
+    @Autowired
+    private UserJpaRepository userJpaRepository;
     
     @Value("${app.env:development}")
     private String environment;
@@ -193,7 +198,8 @@ public class ResumeController {
     @PostMapping("/upload")
     public ResponseEntity<?> uploadResume(
             @RequestParam(value = "resume", required = false) MultipartFile resumeFile,
-            @RequestParam(value = "file", required = false) MultipartFile genericFile
+            @RequestParam(value = "file", required = false) MultipartFile genericFile,
+            Authentication authentication
     ) {
         try {
             MultipartFile file = resumeFile != null ? resumeFile : genericFile;
@@ -259,6 +265,11 @@ public class ResumeController {
             data.put("confidenceScore", parsed.getOrDefault("confidence_score", 1.0));
             data.put("parsingSource", parsed.getOrDefault("parsing_source", "local"));
 
+            if (authentication != null) {
+                String userId = (String) authentication.getPrincipal();
+                syncToUserProfile(userId, data);
+            }
+
             response.put("data", data);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -308,6 +319,120 @@ public class ResumeController {
                 "status", "error",
                 "message", "Failed to match job: " + e.getMessage()
             ));
+        }
+    }
+
+    @PostMapping("/parse-text")
+    public ResponseEntity<?> parseResumeText(
+            @RequestBody Map<String, Object> payload,
+            Authentication authentication
+    ) {
+        try {
+            String text = (String) payload.get("text");
+            String template = (String) payload.getOrDefault("template", "modern");
+            boolean syncProfile = Boolean.TRUE.equals(payload.getOrDefault("syncProfile", true));
+
+            if (text == null || text.trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "status", "error",
+                    "message", "Resume text is required"
+                ));
+            }
+
+            // Parse structured data via AI / LLM generator
+            Map<String, Object> parsedData = aiResumeService.generateResume(text, template);
+
+            // If user is logged in, optionally save/update resume and sync profile in 1-shot
+            if (authentication != null) {
+                String userId = (String) authentication.getPrincipal();
+                
+                if (syncProfile) {
+                    syncToUserProfile(userId, parsedData);
+                }
+
+                try {
+                    Map<String, Object> toSave = new HashMap<>(parsedData);
+                    toSave.put("template", template);
+                    toSave.put("aiGenerated", true);
+                    toSave.put("aiPrompt", text.length() > 200 ? text.substring(0, 197) + "..." : text);
+                    resumeService.createResume(toSave, userId);
+                } catch (Exception ignored) {}
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("data", parsedData);
+            response.put("message", "Resume parsed and profile updated successfully!");
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "status", "error",
+                "message", "Failed to parse resume text: " + e.getMessage()
+            ));
+        }
+    }
+
+    private void syncToUserProfile(String userId, Map<String, Object> data) {
+        if (userId == null || data == null) return;
+        try {
+            Optional<UserEntity> userOpt = userJpaRepository.findById(userId);
+            if (userOpt.isPresent()) {
+                UserEntity user = userOpt.get();
+                
+                if (data.get("personalInfo") instanceof Map) {
+                    Map<?, ?> personal = (Map<?, ?>) data.get("personalInfo");
+                    Object name = personal.get("fullName");
+                    if (name instanceof String && !((String) name).isBlank()) user.setName((String) name);
+                    
+                    Object phone = personal.get("phone");
+                    if (phone instanceof String && !((String) phone).isBlank()) user.setPhone((String) phone);
+                    
+                    Object address = personal.get("address");
+                    if (address instanceof String && !((String) address).isBlank()) user.setLocation((String) address);
+                    
+                    Object summary = personal.get("summary");
+                    if (summary instanceof String && !((String) summary).isBlank()) {
+                        user.setSummary((String) summary);
+                        if (user.getHeadline() == null || user.getHeadline().isBlank()) {
+                            String sumStr = (String) summary;
+                            user.setHeadline(sumStr.length() > 60 ? sumStr.substring(0, 57) + "..." : sumStr);
+                        }
+                    }
+                }
+
+                // Extract skills
+                Object skillsObj = data.get("skills");
+                List<String> skillList = new ArrayList<>();
+                if (skillsObj instanceof Map) {
+                    Map<?, ?> smap = (Map<?, ?>) skillsObj;
+                    Object tech = smap.get("technical");
+                    if (tech instanceof List) {
+                        for (Object s : (List<?>) tech) {
+                            if (s != null && !s.toString().isBlank()) skillList.add(s.toString().trim());
+                        }
+                    }
+                    Object soft = smap.get("soft");
+                    if (soft instanceof List) {
+                        for (Object s : (List<?>) soft) {
+                            if (s != null && !s.toString().isBlank()) skillList.add(s.toString().trim());
+                        }
+                    }
+                } else if (skillsObj instanceof List) {
+                    for (Object s : (List<?>) skillsObj) {
+                        if (s != null && !s.toString().isBlank()) skillList.add(s.toString().trim());
+                    }
+                }
+
+                if (!skillList.isEmpty()) {
+                    user.setSkills(skillList);
+                }
+
+                user.setProfileCompleted(true);
+                userJpaRepository.save(user);
+            }
+        } catch (Exception e) {
+            // Silently continue without blocking
         }
     }
 }

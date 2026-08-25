@@ -65,36 +65,48 @@ const ResumePreview = forwardRef<ResumePreviewHandle, ResumePreviewProps>(({ res
   const handlePrint = () => {
     if (!previewRef.current) return;
     
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
 
-    const printContent = previewRef.current.innerHTML;
-    const styles = Array.from(document.styleSheets)
-      .map(sheet => {
-        try {
-          return Array.from(sheet.cssRules)
-            .map(rule => rule.cssText)
-            .join('\n');
-        } catch (e) {
-          return '';
-        }
-      })
-      .join('\n');
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Resume - ${resumeData.personalInfo?.fullName || 'Resume'}</title>
-          <style>${styles}</style>
-        </head>
-        <body>
-          ${printContent}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Resume - ${resumeData.personalInfo?.fullName || 'Resume'}</title>
+              <style>
+                body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; }
+                @media print { body { padding: 0; } }
+              </style>
+            </head>
+            <body>
+              ${previewRef.current.innerHTML}
+            </body>
+          </html>
+        `);
+        doc.close();
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 1000);
+        }, 300);
+      }
+    } catch (e) {
+      window.print();
+    }
   };
 
   return (
