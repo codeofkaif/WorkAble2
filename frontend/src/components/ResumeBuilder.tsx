@@ -30,11 +30,37 @@ const ResumeBuilder: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classic' | 'creative' | 'minimal'>('modern');
 
   // Handle file extraction from upload
-  const handleFileExtracted = (extractedData: Partial<ResumeData>) => {
+  const handleFileExtracted = (extractedData: any) => {
+    if (!extractedData) return;
+
     setResumeData(prev => ({
       ...prev,
-      ...extractedData,
-      template: prev.template
+      personalInfo: {
+        fullName: extractedData.personalInfo?.fullName || prev.personalInfo?.fullName || '',
+        email: extractedData.personalInfo?.email || prev.personalInfo?.email || '',
+        phone: extractedData.personalInfo?.phone || prev.personalInfo?.phone || '',
+        address: extractedData.personalInfo?.address || prev.personalInfo?.address || '',
+        summary: extractedData.personalInfo?.summary || prev.personalInfo?.summary || '',
+        linkedin: extractedData.personalInfo?.linkedin || prev.personalInfo?.linkedin || '',
+        website: extractedData.personalInfo?.website || prev.personalInfo?.website || ''
+      },
+      experience: (extractedData.experience && extractedData.experience.length > 0)
+        ? extractedData.experience
+        : prev.experience,
+      education: (extractedData.education && extractedData.education.length > 0)
+        ? extractedData.education
+        : prev.education,
+      skills: {
+        technical: extractedData.skills?.technical || prev.skills?.technical || [],
+        soft: extractedData.skills?.soft || prev.skills?.soft || []
+      },
+      projects: (extractedData.projects && extractedData.projects.length > 0)
+        ? extractedData.projects
+        : prev.projects,
+      certifications: (extractedData.certifications && extractedData.certifications.length > 0)
+        ? extractedData.certifications
+        : prev.certifications,
+      template: prev.template || 'modern'
     }));
   };
 

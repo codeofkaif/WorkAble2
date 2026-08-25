@@ -1,0 +1,13 @@
+[
+  "Java", "Python", "JavaScript", "TypeScript", "C++", "C#", "Go", "Rust", "PHP", "Ruby", "Kotlin", "Swift", "Dart", "Scala", "R", "SQL", "HTML5", "CSS3",
+  "React", "React.js", "Next.js", "Angular", "Vue.js", "Svelte", "Redux", "Zustand", "Tailwind CSS", "Bootstrap", "Material UI", "Node.js", "Express.js",
+  "Spring Boot", "Spring Cloud", "Spring Security", "Hibernate", "JPA", "Django", "Flask", "FastAPI", "Ruby on Rails", "ASP.NET Core", "Laravel",
+  "PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch", "Cassandra", "DynamoDB", "Oracle", "SQLite", "Neo4j", "Firebase", "Supabase",
+  "Docker", "Kubernetes", "Helm", "Terraform", "Ansible", "Jenkins", "GitHub Actions", "GitLab CI", "AWS", "Amazon Web Services", "Azure", "Google Cloud Platform", "GCP", "Linux", "Nginx", "Apache", "Kafka", "RabbitMQ", "GraphQL", "REST API", "gRPC", "Microservices",
+  "Machine Learning", "Deep Learning", "Natural Language Processing", "NLP", "Computer Vision", "TensorFlow", "PyTorch", "Scikit-Learn", "Keras", "Pandas", "NumPy", "OpenCV", "Hugging Face", "Transformers", "LLMs", "LangChain", "RAG", "Vector Databases", "Voyage AI",
+  "Git", "GitHub", "GitLab", "Bitbucket", "Jira", "Confluence", "Postman", "Swagger", "Unit Testing", "JUnit", "Mockito", "Jest", "Pytest", "Cypress", "Selenium",
+  "Data Structures", "Algorithms", "Object-Oriented Programming", "OOP", "Design Patterns", "Agile", "Scrum", "CI/CD", "DevOps", "System Design", "Cloud Computing",
+  "Web Accessibility", "WCAG", "ARIA", "Screen Readers", "Assistive Technology", "Accessibility Testing",
+  "Cybersecurity", "OWASP", "OAuth 2.0", "JWT", "Cryptography", "Penetration Testing", "Network Security",
+  "Data Analysis", "Data Engineering", "Apache Spark", "Apache Flink", "Hadoop", "Airflow", "Tableau", "Power BI", "Snowflake", "BigQuery", "dbt"
+]

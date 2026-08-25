@@ -30,9 +30,10 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ data }) => {
   const { state: accessibilityState } = useAccessibility();
 
   // Translations
+  const userName = data?.user?.name || 'Employer';
   const translations: Record<string, Record<string, string>> = {
     en: {
-      greeting: `Welcome, ${data.user.name}!`,
+      greeting: `Welcome, ${userName}!`,
       dashboard: 'Employer Dashboard',
       stats: 'Your Statistics',
       jobsPosted: 'Jobs Posted',
@@ -52,7 +53,7 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ data }) => {
       noApplications: 'No applications yet'
     },
     hi: {
-      greeting: `स्वागत है, ${data.user.name}!`,
+      greeting: `स्वागत है, ${userName}!`,
       dashboard: 'नियोक्ता डैशबोर्ड',
       stats: 'आपके आंकड़े',
       jobsPosted: 'पोस्ट की गई नौकरियां',

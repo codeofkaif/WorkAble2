@@ -1,7 +1,7 @@
 package com.ai.accessibility.service;
 
 import com.ai.accessibility.model.Resume;
-import com.ai.accessibility.repository.ResumeRepository;
+import com.ai.accessibility.repository.mongo.ResumeMongoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -10,23 +10,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Resume Service - Matches Node.js resume routes behavior exactly
- */
 @Service
 public class ResumeService {
     
     @Autowired
-    private ResumeRepository resumeRepository;
+    private ResumeMongoRepository resumeMongoRepository;
     
-    /**
-     * Create resume - Matches POST /api/resume exactly
-     */
     @SuppressWarnings("unchecked")
     public Resume createResume(Map<String, Object> resumeData, String userId) {
         Resume resume = new Resume();
         
-        // Map all fields from request
         if (resumeData.containsKey("personalInfo")) {
             resume.setPersonalInfo((Map<String, Object>) resumeData.get("personalInfo"));
         }
@@ -63,21 +56,15 @@ public class ResumeService {
         resume.setCreatedAt(new Date());
         resume.setUpdatedAt(new Date());
         
-        return resumeRepository.save(resume);
+        return resumeMongoRepository.save(resume);
     }
     
-    /**
-     * Get all resumes for user - Matches GET /api/resume exactly
-     */
     public List<Resume> getUserResumes(String userId) {
-        return resumeRepository.findByUserIdAndIsActiveOrderByUpdatedAtDesc(userId, true);
+        return resumeMongoRepository.findByUserIdAndIsActiveOrderByUpdatedAtDesc(userId, true);
     }
     
-    /**
-     * Get resume by ID - Matches GET /api/resume/:id exactly
-     */
     public Resume getResumeById(String id, String userId) {
-        Optional<Resume> resumeOpt = resumeRepository.findById(id);
+        Optional<Resume> resumeOpt = resumeMongoRepository.findById(id);
         if (resumeOpt.isEmpty()) {
             throw new IllegalArgumentException("Resume not found");
         }
@@ -90,14 +77,10 @@ public class ResumeService {
         return resume;
     }
     
-    /**
-     * Update resume - Matches PUT /api/resume/:id exactly
-     */
     @SuppressWarnings("unchecked")
     public Resume updateResume(String id, Map<String, Object> resumeData, String userId) {
         Resume resume = getResumeById(id, userId);
         
-        // Update fields
         if (resumeData.containsKey("personalInfo")) {
             resume.setPersonalInfo((Map<String, Object>) resumeData.get("personalInfo"));
         }
@@ -125,16 +108,13 @@ public class ResumeService {
         
         resume.setUpdatedAt(new Date());
         
-        return resumeRepository.save(resume);
+        return resumeMongoRepository.save(resume);
     }
     
-    /**
-     * Delete resume - Matches DELETE /api/resume/:id exactly
-     */
     public void deleteResume(String id, String userId) {
         Resume resume = getResumeById(id, userId);
         resume.setIsActive(false);
         resume.setUpdatedAt(new Date());
-        resumeRepository.save(resume);
+        resumeMongoRepository.save(resume);
     }
 }

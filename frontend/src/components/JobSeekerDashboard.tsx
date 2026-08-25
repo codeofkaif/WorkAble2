@@ -28,13 +28,14 @@ interface JobSeekerDashboardProps {
  * - Accessibility features
  */
 const JobSeekerDashboard: React.FC<JobSeekerDashboardProps> = ({ data }) => {
-  const { state: accessibilityState, toggleLanguage } = useAccessibility();
+  const { state: accessibilityState } = useAccessibility();
   const [voiceSearchActive, setVoiceSearchActive] = useState(false);
 
   // Translations (simple implementation - can be extended with i18n library)
+  const userName = data?.user?.name || 'User';
   const translations: Record<string, Record<string, string>> = {
     en: {
-      greeting: `Welcome back, ${data.user.name}!`,
+      greeting: `Welcome back, ${userName}!`,
       profileCompletion: 'Profile Completion',
       completeProfile: 'Complete Profile',
       jobStats: 'Your Job Statistics',
@@ -53,7 +54,7 @@ const JobSeekerDashboard: React.FC<JobSeekerDashboardProps> = ({ data }) => {
       interviews: 'Interviews'
     },
     hi: {
-      greeting: `वापसी पर स्वागत है, ${data.user.name}!`,
+      greeting: `वापसी पर स्वागत है, ${userName}!`,
       profileCompletion: 'प्रोफ़ाइल पूर्णता',
       completeProfile: 'प्रोफ़ाइल पूर्ण करें',
       jobStats: 'आपके नौकरी आंकड़े',
@@ -108,7 +109,7 @@ const JobSeekerDashboard: React.FC<JobSeekerDashboardProps> = ({ data }) => {
             {t.greeting}
           </h1>
           <p className="text-gray-600" aria-describedby="dashboard-title">
-            {data.user.location || 'Location not set'}
+            {data?.user?.location || 'Location not set'}
           </p>
         </motion.div>
 

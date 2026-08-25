@@ -42,7 +42,13 @@ public class JwtUtil {
          * we use SecretKeySpec directly and let the HMAC implementation handle key sizing.
          */
         byte[] secretBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
-        return new SecretKeySpec(secretBytes, "HmacSHA256");
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] keyBytes = md.digest(secretBytes);
+            return new SecretKeySpec(keyBytes, "HmacSHA256");
+        } catch (Exception e) {
+            return new SecretKeySpec(secretBytes, "HmacSHA256");
+        }
     }
     
     /**
