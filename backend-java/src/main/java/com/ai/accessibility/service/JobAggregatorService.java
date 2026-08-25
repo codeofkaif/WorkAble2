@@ -10,57 +10,92 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Job Aggregator — fans out to all registered {@link JobProvider} beans,
- * collects their results, then hands them off to {@link JobNormalizerService}
- * for deduplication and persistence.
+ * Job Aggregator.
  *
- * The aggregator does NOT know how any individual provider works internally.
+ * Responsibilities:
+ *  - Orchestrates calls to all registered {@link JobProvider} implementations (Jooble, Adzuna, JSearch).
+ *  - Handles API failures, timeouts, missing keys, and rate limits gracefully.
+ *  - Combines results across all providers.
+ *  - Forwards the collected raw jobs to {@link JobNormalizerService}.
+ *  - Never exposes provider-specific data formats to the rest of the application.
  */
 @Service
 public class JobAggregatorService {
 
     private static final Logger log = LoggerFactory.getLogger(JobAggregatorService.class);
 
-    /** Spring injects ALL JobProvider beans (Jooble, Adzuna, JSearch) automatically */
     private final List<JobProvider> providers;
     private final JobNormalizerService normalizerService;
 
     public JobAggregatorService(List<JobProvider> providers,
-                                 JobNormalizerService normalizerService) {
-        this.providers = providers;
+                                JobNormalizerService normalizerService) {
+        this.providers = providers != null ? providers : List.of();
         this.normalizerService = normalizerService;
     }
 
     /**
-     * Fetch jobs from all providers for the given keyword + location,
-     * deduplicate them, and persist them to PostgreSQL.
+     * Ingests jobs from all available external providers for the specified keyword & location,
+     * normalizes them, deduplicates against PostgreSQL, and saves unique records.
      *
-     * @param keyword  Job search keyword (e.g. "Java developer")
-     * @param location Preferred location (e.g. "remote", "New York")
-     * @return Number of new (non-duplicate) jobs saved to the database
+     * @param keyword  Job title / keyword
+     * @param location Desired location / remote
+     * @return Number of jobs saved (inserted + updated)
      */
     public int fetchAndStore(String keyword, String location) {
-        log.info("Starting job aggregation: keyword='{}', location='{}'", keyword, location);
+        log.info("Job Aggregator: Starting external job ingestion (keyword='{}', location='{}')", keyword, location);
 
-        List<NormalizedJob> allJobs = new ArrayList<>();
+        List<NormalizedJob> combinedRawJobs = new ArrayList<>();
+        int successfulProviders = 0;
 
         for (JobProvider provider : providers) {
-            log.info("Fetching from provider: {}", provider.getSourceName());
+            String sourceName = provider.getSourceName();
             try {
-                // Fetch page 1 from each provider (sufficient for a college project)
+                log.info("Job Aggregator: Querying provider '{}'", sourceName);
                 List<NormalizedJob> jobs = provider.fetchJobs(keyword, location, 1);
-                log.info("Provider '{}' returned {} jobs", provider.getSourceName(), jobs.size());
-                allJobs.addAll(jobs);
+
+                if (jobs != null && !jobs.isEmpty()) {
+                    combinedRawJobs.addAll(jobs);
+                    successfulProviders++;
+                    log.info("Job Aggregator: Provider '{}' returned {} jobs", sourceName, jobs.size());
+                } else {
+                    log.debug("Job Aggregator: Provider '{}' returned 0 jobs", sourceName);
+                }
             } catch (Exception e) {
-                // One failing provider must not stop the others
-                log.error("Provider '{}' threw an unexpected exception: {}",
-                        provider.getSourceName(), e.getMessage());
+                // One provider's failure must never crash the aggregation pipeline
+                log.error("Job Aggregator: Provider '{}' failed: {}", sourceName, e.getMessage());
             }
         }
 
-        log.info("Total raw jobs collected from all providers: {}", allJobs.size());
-        int saved = normalizerService.deduplicateAndSave(allJobs);
-        log.info("Job aggregation complete. New jobs saved: {}", saved);
+        log.info("Job Aggregator: Ingestion summary — {} raw jobs collected from {}/{} active providers",
+                combinedRawJobs.size(), successfulProviders, providers.size());
+
+        if (combinedRawJobs.isEmpty()) {
+            log.warn("Job Aggregator: No jobs were returned by any external provider");
+            return 0;
+        }
+
+        // Delegate to Normalizer & Deduplicator
+        int saved = normalizerService.normalizeAndPersist(combinedRawJobs);
+        log.info("Job Aggregator: Normalized and persisted {} jobs in PostgreSQL", saved);
         return saved;
+    }
+
+    /**
+     * Fetches default sets of jobs for background synchronization across common technology categories.
+     */
+    public int fetchDefaultJobSync() {
+        List<String> keywords = List.of(
+                "software engineer",
+                "java developer",
+                "full stack developer",
+                "python developer",
+                "accessibility specialist"
+        );
+
+        int totalSaved = 0;
+        for (String kw : keywords) {
+            totalSaved += fetchAndStore(kw, "remote");
+        }
+        return totalSaved;
     }
 }

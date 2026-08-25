@@ -32,10 +32,14 @@ app:
     api-key: ${CONTEXT_ENGINE_API_KEY:test-api-key}
     knowledge-base-id: ${KNOWLEDGE_BASE_ID:kb-workable-001}
   env: ${SPRING_PROFILES_ACTIVE:development}
-  # External Job Provider API Keys
-  # Set these as environment variables (or update values here for local dev).
-  # Each provider skips gracefully if its key is blank.
+  # DB-First Job Aggregation, Synchronization, and Freshness Policy
   jobs:
+    freshness-hours: ${JOB_FRESHNESS_HOURS:6}
+    min-recommendation-jobs: ${MIN_RECOMMENDATION_JOBS:20}
+    sync-interval-hours: ${JOB_SYNC_INTERVAL_HOURS:6}
+    sync-interval-ms: ${JOB_SYNC_INTERVAL_MS:21600000} # 6 hours
+    sync-initial-delay-ms: ${JOB_SYNC_INITIAL_DELAY_MS:60000} # 1 min after startup
+    sync-enabled: ${JOB_SYNC_ENABLED:true}
     jooble:
       api-key: ${JOOBLE_API_KEY:}
     adzuna:

@@ -10,16 +10,16 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.ZoneId;
+import java.util.*;
 
 /**
  * Jooble job provider.
  * API docs: https://jooble.org/api/about
- * Auth: POST https://jooble.org/api/<API_KEY>  with JSON body { keywords, location, page }
+ * Auth: POST https://jooble.org/api/<API_KEY> with JSON body { keywords, location, page }
  */
 @Component
 public class JoobleJobProvider implements JobProvider {
@@ -27,6 +27,7 @@ public class JoobleJobProvider implements JobProvider {
     private static final Logger log = LoggerFactory.getLogger(JoobleJobProvider.class);
     private static final String BASE_URL = "https://jooble.org/api/";
     private static final String SOURCE = "jooble";
+    private static final Duration TIMEOUT = Duration.ofSeconds(8);
 
     @Value("${app.jobs.jooble.api-key:}")
     private String apiKey;
@@ -48,18 +49,18 @@ public class JoobleJobProvider implements JobProvider {
     public List<NormalizedJob> fetchJobs(String keyword, String location, int page) {
         List<NormalizedJob> results = new ArrayList<>();
 
-        if (apiKey == null || apiKey.isBlank()) {
+        if (apiKey == null || apiKey.trim().isEmpty()) {
             log.warn("Jooble API key not configured — skipping Jooble fetch");
             return results;
         }
 
         try {
             Map<String, Object> body = new HashMap<>();
-            body.put("keywords", keyword != null ? keyword : "");
+            body.put("keywords", keyword != null ? keyword : "software engineer");
             body.put("location", location != null ? location : "");
             body.put("page", page);
 
-            String url = BASE_URL + apiKey;
+            String url = BASE_URL + apiKey.trim();
 
             String response = webClient.post()
                     .uri(url)
@@ -67,6 +68,7 @@ public class JoobleJobProvider implements JobProvider {
                     .bodyValue(body)
                     .retrieve()
                     .bodyToMono(String.class)
+                    .timeout(TIMEOUT)
                     .block();
 
             if (response == null || response.isBlank()) return results;
@@ -77,7 +79,10 @@ public class JoobleJobProvider implements JobProvider {
             if (jobs.isArray()) {
                 for (JsonNode item : jobs) {
                     try {
-                        results.add(toNormalized(item));
+                        NormalizedJob job = toNormalized(item);
+                        if (job != null && job.getTitle() != null) {
+                            results.add(job);
+                        }
                     } catch (Exception e) {
                         log.debug("Jooble: failed to parse job item — {}", e.getMessage());
                     }
@@ -88,7 +93,7 @@ public class JoobleJobProvider implements JobProvider {
             log.warn("Jooble fetch failed (page={}, keyword={}): {}", page, keyword, e.getMessage());
         }
 
-        log.info("Jooble: fetched {} jobs for keyword='{}', location='{}'", results.size(), keyword, location);
+        log.info("Jooble: successfully fetched {} jobs for keyword='{}', location='{}'", results.size(), keyword, location);
         return results;
     }
 
@@ -108,17 +113,28 @@ public class JoobleJobProvider implements JobProvider {
         job.setApplyUrl(text(item, "link"));
         job.setSalary(text(item, "salary"));
         job.setEmploymentType(text(item, "type"));
+        job.setFetchedAt(new Date());
+        job.setIsActive(true);
 
-        // Jooble does not expose a structured skills list — leave empty; Normalizer extracts them
-        job.setSkills(new ArrayList<>());
-
-        // Parse date if present (format: "2024-01-15T00:00:00")
+        // Parse date if present
         String updated = text(item, "updated");
+        Date postedDate = null;
         if (updated != null && updated.length() >= 10) {
             try {
-                job.setPostedDate(LocalDate.parse(updated.substring(0, 10)));
+                LocalDate ld = LocalDate.parse(updated.substring(0, 10));
+                postedDate = Date.from(ld.atStartOfDay(ZoneId.systemDefault()).toInstant());
             } catch (Exception ignored) {}
         }
+        if (postedDate == null) {
+            postedDate = new Date();
+        }
+        job.setPostedAt(postedDate);
+
+        // Expiration: 30 days after posted
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(postedDate);
+        cal.add(Calendar.DAY_OF_MONTH, 30);
+        job.setExpiresAt(cal.getTime());
 
         return job;
     }

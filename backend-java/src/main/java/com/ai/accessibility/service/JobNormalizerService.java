@@ -1,136 +1,133 @@
 package com.ai.accessibility.service;
 
-import com.ai.accessibility.entity.NormalizedJobEntity;
 import com.ai.accessibility.model.NormalizedJob;
-import com.ai.accessibility.repository.jpa.NormalizedJobJpaRepository;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
- * Job Normalizer — converts incoming {@link NormalizedJob} DTOs into
- * {@link NormalizedJobEntity} entities, applies three-layer deduplication,
- * and persists unique jobs to PostgreSQL.
+ * Job Normalizer.
  *
- * Deduplication order:
- *  1. Exact sourceJobId + source match    → skip
- *  2. Exact applyUrl match                → skip
- *  3. Normalised company + title + location match → skip
+ * Responsibilities:
+ *  - Converts provider-specific responses and fields into the standard {@link NormalizedJob} model.
+ *  - Sanitizes text, normalizes employment types, extracts skills from descriptions if empty.
+ *  - Ensures dates and expiration boundaries are valid.
+ *  - Delegates normalized jobs to {@link JobDeduplicationService} for deduplication and persistence.
  */
 @Service
 public class JobNormalizerService {
 
     private static final Logger log = LoggerFactory.getLogger(JobNormalizerService.class);
 
-    private final NormalizedJobJpaRepository repo;
+    private static final List<String> COMMON_SKILLS = List.of(
+            "java", "spring boot", "spring", "python", "javascript", "typescript", "react",
+            "node.js", "sql", "postgresql", "mongodb", "docker", "kubernetes", "aws", "azure",
+            "git", "rest api", "graphql", "html", "css", "c++", "c#", ".net", "kafka", "redis",
+            "machine learning", "data analysis", "accessibility", "wcag", "agile", "scrum"
+    );
 
-    public JobNormalizerService(NormalizedJobJpaRepository repo) {
-        this.repo = repo;
+    private final JobDeduplicationService deduplicationService;
+
+    public JobNormalizerService(JobDeduplicationService deduplicationService) {
+        this.deduplicationService = deduplicationService;
     }
 
     /**
-     * Deduplicates the incoming list against the database and saves new jobs.
+     * Normalizes a batch of raw jobs and forwards them to deduplication & storage.
      *
-     * @param jobs Raw jobs from all providers
-     * @return Number of jobs actually saved
+     * @param rawJobs Raw jobs from providers
+     * @return Number of saved/updated unique jobs
      */
-    public int deduplicateAndSave(List<NormalizedJob> jobs) {
-        int saved = 0;
+    public int normalizeAndPersist(List<NormalizedJob> rawJobs) {
+        if (rawJobs == null || rawJobs.isEmpty()) {
+            return 0;
+        }
 
-        for (NormalizedJob job : jobs) {
+        List<NormalizedJob> normalizedList = new ArrayList<>();
+        for (NormalizedJob raw : rawJobs) {
             try {
-                if (isDuplicate(job)) {
-                    log.debug("Skipping duplicate job: '{}' @ '{}' [{}]",
-                            job.getTitle(), job.getCompany(), job.getSource());
-                    continue;
+                NormalizedJob normalized = normalizeSingle(raw);
+                if (normalized != null) {
+                    normalizedList.add(normalized);
                 }
-
-                NormalizedJobEntity entity = toEntity(job);
-                repo.save(entity);
-                saved++;
-
             } catch (Exception e) {
-                log.warn("Failed to save job '{}' from '{}': {}",
-                        job.getTitle(), job.getSource(), e.getMessage());
+                log.debug("Error normalizing job '{}': {}", raw.getTitle(), e.getMessage());
             }
         }
 
-        log.info("Deduplication complete: {} unique jobs saved out of {} total", saved, jobs.size());
-        return saved;
+        return deduplicationService.deduplicateAndSave(normalizedList);
     }
 
-    // -----------------------------------------------------------------------
-    // Deduplication
-    // -----------------------------------------------------------------------
+    /**
+     * Normalizes a single job.
+     */
+    public NormalizedJob normalizeSingle(NormalizedJob job) {
+        if (job == null || job.getTitle() == null || job.getTitle().isBlank()) {
+            return null;
+        }
 
-    private boolean isDuplicate(NormalizedJob job) {
-        // Layer 1: exact provider ID match
-        if (job.getSourceJobId() != null && job.getSource() != null) {
-            if (repo.existsBySourceJobIdAndSource(job.getSourceJobId(), job.getSource())) {
-                return true;
+        // 1. Sanitize text fields
+        job.setTitle(cleanText(job.getTitle()));
+        job.setCompany(job.getCompany() != null ? cleanText(job.getCompany()) : "Unknown Company");
+        job.setLocation(job.getLocation() != null ? cleanText(job.getLocation()) : "Remote");
+
+        // 2. Standardize employment type
+        job.setEmploymentType(standardizeEmploymentType(job.getEmploymentType(), job.getTitle() + " " + (job.getDescription() != null ? job.getDescription() : "")));
+
+        // 3. Extract skills if empty
+        if (job.getSkills() == null || job.getSkills().isEmpty()) {
+            job.setSkills(extractSkillsFromText(job.getTitle() + " " + (job.getDescription() != null ? job.getDescription() : "")));
+        }
+
+        // 4. Ensure timestamps
+        Date now = new Date();
+        if (job.getFetchedAt() == null) {
+            job.setFetchedAt(now);
+        }
+        if (job.getPostedAt() == null) {
+            job.setPostedAt(now);
+        }
+        if (job.getExpiresAt() == null) {
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(job.getPostedAt());
+            cal.add(Calendar.DAY_OF_MONTH, 30);
+            job.setExpiresAt(cal.getTime());
+        }
+
+        job.setIsActive(true);
+        return job;
+    }
+
+    private String cleanText(String text) {
+        if (text == null) return null;
+        // Strip HTML tags if present (some APIs return HTML snippets)
+        String cleaned = text.replaceAll("<[^>]*>", " ");
+        cleaned = cleaned.replaceAll("\\s+", " ").trim();
+        return cleaned;
+    }
+
+    private String standardizeEmploymentType(String rawType, String fallbackText) {
+        String s = (rawType != null ? rawType : fallbackText).toLowerCase();
+        if (s.contains("contract") || s.contains("contractor") || s.contains("freelance")) return "contract";
+        if (s.contains("intern") || s.contains("internship")) return "internship";
+        if (s.contains("part-time") || s.contains("part time")) return "part-time";
+        return "full-time";
+    }
+
+    private List<String> extractSkillsFromText(String text) {
+        if (text == null || text.isBlank()) return new ArrayList<>();
+        String lower = " " + text.toLowerCase() + " ";
+        List<String> found = new ArrayList<>();
+
+        for (String skill : COMMON_SKILLS) {
+            String pattern = "(?i)\\b" + Pattern.quote(skill) + "\\b";
+            if (Pattern.compile(pattern).matcher(lower).find()) {
+                found.add(skill);
             }
         }
-
-        // Layer 2: exact apply URL match
-        if (job.getApplyUrl() != null && !job.getApplyUrl().isBlank()) {
-            if (repo.existsByApplyUrl(normalizeUrl(job.getApplyUrl()))) {
-                return true;
-            }
-        }
-
-        // Layer 3: fuzzy company + title + location
-        String company  = normalizeText(job.getCompany());
-        String title    = normalizeText(job.getTitle());
-        String location = normalizeText(job.getLocation());
-
-        if (company != null && title != null && location != null) {
-            return repo.findByCompanyAndTitleAndLocation(company, title, location).isPresent();
-        }
-
-        return false;
-    }
-
-    // -----------------------------------------------------------------------
-    // DTO → Entity mapping
-    // -----------------------------------------------------------------------
-
-    private NormalizedJobEntity toEntity(NormalizedJob job) {
-        NormalizedJobEntity e = new NormalizedJobEntity();
-
-        e.setTitle(job.getTitle() != null ? job.getTitle() : "Untitled");
-        e.setCompany(job.getCompany() != null ? job.getCompany() : "Unknown");
-        e.setLocation(job.getLocation());
-        e.setDescription(job.getDescription());
-        e.setSkills(job.getSkills() != null ? job.getSkills() : new ArrayList<>());
-        e.setSalary(job.getSalary());
-        e.setEmploymentType(job.getEmploymentType());
-        e.setSource(job.getSource());
-        e.setSourceJobId(job.getSourceJobId());
-        e.setApplyUrl(job.getApplyUrl() != null ? normalizeUrl(job.getApplyUrl()) : null);
-        e.setPostedDate(job.getPostedDate());
-
-        return e;
-    }
-
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
-
-    /** Remove query-string tracking params for cleaner URL dedup */
-    private String normalizeUrl(String url) {
-        if (url == null) return null;
-        int q = url.indexOf('?');
-        return (q > 0 ? url.substring(0, q) : url).trim().toLowerCase();
-    }
-
-    /** Lowercase + collapse whitespace for fuzzy dedup */
-    private String normalizeText(String text) {
-        if (text == null || text.isBlank()) return null;
-        return text.trim().toLowerCase().replaceAll("\\s+", " ");
+        return found;
     }
 }

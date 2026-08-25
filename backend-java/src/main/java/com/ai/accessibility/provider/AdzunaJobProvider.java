@@ -10,10 +10,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Duration;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.ZoneId;
+import java.util.*;
 
 /**
  * Adzuna job provider.
@@ -27,6 +27,7 @@ public class AdzunaJobProvider implements JobProvider {
     private static final Logger log = LoggerFactory.getLogger(AdzunaJobProvider.class);
     private static final String BASE_URL = "https://api.adzuna.com/v1/api/jobs";
     private static final String SOURCE = "adzuna";
+    private static final Duration TIMEOUT = Duration.ofSeconds(8);
 
     @Value("${app.jobs.adzuna.app-id:}")
     private String appId;
@@ -34,7 +35,7 @@ public class AdzunaJobProvider implements JobProvider {
     @Value("${app.jobs.adzuna.api-key:}")
     private String apiKey;
 
-    @Value("${app.jobs.adzuna.country:gb}")
+    @Value("${app.jobs.adzuna.country:us}")
     private String country; // "us", "gb", "in", etc.
 
     private final WebClient webClient;
@@ -54,16 +55,16 @@ public class AdzunaJobProvider implements JobProvider {
     public List<NormalizedJob> fetchJobs(String keyword, String location, int page) {
         List<NormalizedJob> results = new ArrayList<>();
 
-        if (appId == null || appId.isBlank() || apiKey == null || apiKey.isBlank()) {
+        if (appId == null || appId.trim().isEmpty() || apiKey == null || apiKey.trim().isEmpty()) {
             log.warn("Adzuna app_id / api_key not configured — skipping Adzuna fetch");
             return results;
         }
 
         try {
             UriComponentsBuilder uriBuilder = UriComponentsBuilder
-                    .fromHttpUrl(BASE_URL + "/" + country + "/search/" + page)
-                    .queryParam("app_id", appId)
-                    .queryParam("app_key", apiKey)
+                    .fromHttpUrl(BASE_URL + "/" + country.trim().toLowerCase() + "/search/" + page)
+                    .queryParam("app_id", appId.trim())
+                    .queryParam("app_key", apiKey.trim())
                     .queryParam("results_per_page", 20)
                     .queryParam("content-type", "application/json");
 
@@ -80,6 +81,7 @@ public class AdzunaJobProvider implements JobProvider {
                     .uri(url)
                     .retrieve()
                     .bodyToMono(String.class)
+                    .timeout(TIMEOUT)
                     .block();
 
             if (response == null || response.isBlank()) return results;
@@ -90,7 +92,10 @@ public class AdzunaJobProvider implements JobProvider {
             if (jobs.isArray()) {
                 for (JsonNode item : jobs) {
                     try {
-                        results.add(toNormalized(item));
+                        NormalizedJob job = toNormalized(item);
+                        if (job != null && job.getTitle() != null) {
+                            results.add(job);
+                        }
                     } catch (Exception e) {
                         log.debug("Adzuna: failed to parse job item — {}", e.getMessage());
                     }
@@ -101,7 +106,7 @@ public class AdzunaJobProvider implements JobProvider {
             log.warn("Adzuna fetch failed (page={}, keyword={}): {}", page, keyword, e.getMessage());
         }
 
-        log.info("Adzuna: fetched {} jobs for keyword='{}', location='{}'", results.size(), keyword, location);
+        log.info("Adzuna: successfully fetched {} jobs for keyword='{}', location='{}'", results.size(), keyword, location);
         return results;
     }
 
@@ -131,22 +136,32 @@ public class AdzunaJobProvider implements JobProvider {
         String salaryMin = text(item, "salary_min");
         String salaryMax = text(item, "salary_max");
         if (salaryMin != null || salaryMax != null) {
-            job.setSalary(salaryMin + " – " + salaryMax);
+            job.setSalary((salaryMin != null ? salaryMin : "") + " – " + (salaryMax != null ? salaryMax : ""));
         }
 
         job.setEmploymentType(text(item, "contract_type")); // "permanent" | "contract"
-
-        // Adzuna does not return structured skills
-        job.setSkills(new ArrayList<>());
+        job.setFetchedAt(new Date());
+        job.setIsActive(true);
 
         // Parse created date
         String created = text(item, "created");
+        Date postedDate = null;
         if (created != null && created.length() >= 10) {
             try {
-                // Adzuna uses ISO 8601: "2024-01-15T09:00:00Z"
-                job.setPostedDate(LocalDate.parse(created.substring(0, 10)));
+                LocalDate ld = LocalDate.parse(created.substring(0, 10));
+                postedDate = Date.from(ld.atStartOfDay(ZoneId.systemDefault()).toInstant());
             } catch (Exception ignored) {}
         }
+        if (postedDate == null) {
+            postedDate = new Date();
+        }
+        job.setPostedAt(postedDate);
+
+        // Expiration: 30 days after posted
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(postedDate);
+        cal.add(Calendar.DAY_OF_MONTH, 30);
+        job.setExpiresAt(cal.getTime());
 
         return job;
     }

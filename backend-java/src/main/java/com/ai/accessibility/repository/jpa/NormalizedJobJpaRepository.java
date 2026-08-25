@@ -2,37 +2,29 @@ package com.ai.accessibility.repository.jpa;
 
 import com.ai.accessibility.entity.NormalizedJobEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Spring Data JPA repository for normalized (external API) jobs.
+ * Spring Data JPA repository for normalized jobs in PostgreSQL.
  */
 @Repository
 public interface NormalizedJobJpaRepository extends JpaRepository<NormalizedJobEntity, String> {
 
-    /** Used for deduplication: exact provider ID match */
-    boolean existsBySourceJobIdAndSource(String sourceJobId, String source);
+    /** Deduplication check by provider unique job ID */
+    Optional<NormalizedJobEntity> findBySourceJobIdAndSource(String sourceJobId, String source);
 
-    /** Used for deduplication: exact apply-URL match */
-    boolean existsByApplyUrl(String applyUrl);
+    /** Deduplication check by application URL */
+    Optional<NormalizedJobEntity> findByApplyUrl(String applyUrl);
 
-    /** Fetch by provider */
-    List<NormalizedJobEntity> findBySource(String source);
-
-    /** Full-text search across title, company, location */
-    @Query("SELECT j FROM NormalizedJobEntity j WHERE " +
-           "LOWER(j.title) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
-           "LOWER(j.company) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
-           "LOWER(j.location) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
-           "LOWER(j.description) LIKE LOWER(CONCAT('%', :q, '%'))")
-    List<NormalizedJobEntity> searchJobs(@Param("q") String query);
-
-    /** Fuzzy dedup helper: jobs with same company + title + location */
+    /** Fuzzy deduplication check by company, title, and location */
     @Query("SELECT j FROM NormalizedJobEntity j WHERE " +
            "LOWER(j.company) = LOWER(:company) AND " +
            "LOWER(j.title)   = LOWER(:title)   AND " +
@@ -42,7 +34,36 @@ public interface NormalizedJobJpaRepository extends JpaRepository<NormalizedJobE
             @Param("title") String title,
             @Param("location") String location);
 
-    /** All jobs ordered by newest first, limited to avoid huge payloads */
-    @Query("SELECT j FROM NormalizedJobEntity j ORDER BY j.createdAt DESC")
-    List<NormalizedJobEntity> findAllOrderByCreatedAtDesc();
+    /** Check count of active jobs fetched after the specified freshness cutoff */
+    @Query("SELECT COUNT(j) FROM NormalizedJobEntity j WHERE j.isActive = true AND j.fetchedAt >= :cutoff")
+    long countFreshActiveJobs(@Param("cutoff") Date cutoff);
+
+    /** Find all active fresh jobs */
+    @Query("SELECT j FROM NormalizedJobEntity j WHERE j.isActive = true AND j.fetchedAt >= :cutoff ORDER BY COALESCE(j.postedAt, j.createdAt) DESC")
+    List<NormalizedJobEntity> findFreshActiveJobs(@Param("cutoff") Date cutoff);
+
+    /** Find all active jobs ordered by newest first */
+    @Query("SELECT j FROM NormalizedJobEntity j WHERE j.isActive = true ORDER BY COALESCE(j.postedAt, j.createdAt) DESC")
+    List<NormalizedJobEntity> findAllActiveJobsOrderByNewest();
+
+    /** Count all currently active jobs */
+    long countByIsActiveTrue();
+
+    /** Find jobs that have passed their expiration date and are still marked active */
+    @Query("SELECT j FROM NormalizedJobEntity j WHERE j.isActive = true AND j.expiresAt IS NOT NULL AND j.expiresAt < :now")
+    List<NormalizedJobEntity> findExpiredActiveJobs(@Param("now") Date now);
+
+    /** Mark expired jobs as inactive in batch */
+    @Modifying
+    @Transactional
+    @Query("UPDATE NormalizedJobEntity j SET j.isActive = false, j.updatedAt = :now WHERE j.isActive = true AND j.expiresAt IS NOT NULL AND j.expiresAt < :now")
+    int deactivateExpiredJobs(@Param("now") Date now);
+
+    /** Full-text / substring search across title, company, location, description */
+    @Query("SELECT j FROM NormalizedJobEntity j WHERE j.isActive = true AND (" +
+           "LOWER(j.title) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+           "LOWER(j.company) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+           "LOWER(j.location) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+           "LOWER(j.description) LIKE LOWER(CONCAT('%', :q, '%')))")
+    List<NormalizedJobEntity> searchActiveJobs(@Param("q") String query);
 }

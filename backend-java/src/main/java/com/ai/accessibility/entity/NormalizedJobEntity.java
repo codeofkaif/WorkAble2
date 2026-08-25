@@ -1,16 +1,14 @@
 package com.ai.accessibility.entity;
 
 import jakarta.persistence.*;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * JPA entity for normalized jobs fetched from external APIs.
- * Stored in the "normalized_jobs" table — completely separate from
- * the employer-posted "jobs" table (JobEntity).
+ * JPA entity for normalized jobs in PostgreSQL.
+ * Serves as the primary job store for recommendation queries and background synchronizations.
  */
 @Entity
 @Table(
@@ -18,7 +16,9 @@ import java.util.UUID;
     indexes = {
         @Index(name = "idx_nj_source_job_id", columnList = "source, source_job_id", unique = true),
         @Index(name = "idx_nj_apply_url",     columnList = "apply_url"),
-        @Index(name = "idx_nj_source",        columnList = "source")
+        @Index(name = "idx_nj_source",        columnList = "source"),
+        @Index(name = "idx_nj_active_fetched", columnList = "is_active, fetched_at"),
+        @Index(name = "idx_nj_active_posted",  columnList = "is_active, posted_at")
     }
 )
 public class NormalizedJobEntity {
@@ -39,7 +39,7 @@ public class NormalizedJobEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    /** Extracted or inferred skill keywords */
+    /** Extracted or normalized skill keywords */
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "normalized_job_skills", joinColumns = @JoinColumn(name = "job_id"))
     @Column(name = "skill")
@@ -64,8 +64,20 @@ public class NormalizedJobEntity {
     @Column(name = "apply_url", length = 1024)
     private String applyUrl;
 
-    @Column(name = "posted_date")
-    private LocalDate postedDate;
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "posted_at")
+    private Date postedAt;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "fetched_at")
+    private Date fetchedAt;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "expires_at")
+    private Date expiresAt;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
 
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at")
@@ -80,8 +92,10 @@ public class NormalizedJobEntity {
         if (id == null || id.isEmpty()) {
             id = UUID.randomUUID().toString();
         }
-        createdAt = new Date();
-        updatedAt = new Date();
+        Date now = new Date();
+        if (createdAt == null) createdAt = now;
+        if (updatedAt == null) updatedAt = now;
+        if (fetchedAt == null) fetchedAt = now;
     }
 
     @PreUpdate
@@ -124,8 +138,17 @@ public class NormalizedJobEntity {
     public String getApplyUrl() { return applyUrl; }
     public void setApplyUrl(String applyUrl) { this.applyUrl = applyUrl; }
 
-    public LocalDate getPostedDate() { return postedDate; }
-    public void setPostedDate(LocalDate postedDate) { this.postedDate = postedDate; }
+    public Date getPostedAt() { return postedAt; }
+    public void setPostedAt(Date postedAt) { this.postedAt = postedAt; }
+
+    public Date getFetchedAt() { return fetchedAt; }
+    public void setFetchedAt(Date fetchedAt) { this.fetchedAt = fetchedAt; }
+
+    public Date getExpiresAt() { return expiresAt; }
+    public void setExpiresAt(Date expiresAt) { this.expiresAt = expiresAt; }
+
+    public boolean isActive() { return isActive; }
+    public void setIsActive(boolean active) { isActive = active; }
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }

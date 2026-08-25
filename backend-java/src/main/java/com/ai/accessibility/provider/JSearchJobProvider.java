@@ -10,8 +10,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -26,6 +30,7 @@ public class JSearchJobProvider implements JobProvider {
     private static final Logger log = LoggerFactory.getLogger(JSearchJobProvider.class);
     private static final String BASE_URL = "https://jsearch.p.rapidapi.com/search";
     private static final String SOURCE = "jsearch";
+    private static final Duration TIMEOUT = Duration.ofSeconds(8);
 
     @Value("${app.jobs.jsearch.api-key:}")
     private String apiKey;
@@ -50,13 +55,13 @@ public class JSearchJobProvider implements JobProvider {
     public List<NormalizedJob> fetchJobs(String keyword, String location, int page) {
         List<NormalizedJob> results = new ArrayList<>();
 
-        if (apiKey == null || apiKey.isBlank()) {
+        if (apiKey == null || apiKey.trim().isEmpty()) {
             log.warn("JSearch API key not configured — skipping JSearch fetch");
             return results;
         }
 
         try {
-            String query = (keyword != null ? keyword : "software engineer")
+            String query = (keyword != null && !keyword.isBlank() ? keyword : "software engineer")
                     + (location != null && !location.isBlank() ? " in " + location : "");
 
             String url = UriComponentsBuilder.fromHttpUrl(BASE_URL)
@@ -67,10 +72,11 @@ public class JSearchJobProvider implements JobProvider {
 
             String response = webClient.get()
                     .uri(url)
-                    .header("X-RapidAPI-Key", apiKey)
-                    .header("X-RapidAPI-Host", apiHost)
+                    .header("X-RapidAPI-Key", apiKey.trim())
+                    .header("X-RapidAPI-Host", apiHost.trim())
                     .retrieve()
                     .bodyToMono(String.class)
+                    .timeout(TIMEOUT)
                     .block();
 
             if (response == null || response.isBlank()) return results;
@@ -81,7 +87,10 @@ public class JSearchJobProvider implements JobProvider {
             if (jobs.isArray()) {
                 for (JsonNode item : jobs) {
                     try {
-                        results.add(toNormalized(item));
+                        NormalizedJob job = toNormalized(item);
+                        if (job != null && job.getTitle() != null) {
+                            results.add(job);
+                        }
                     } catch (Exception e) {
                         log.debug("JSearch: failed to parse job item — {}", e.getMessage());
                     }
@@ -92,7 +101,7 @@ public class JSearchJobProvider implements JobProvider {
             log.warn("JSearch fetch failed (page={}, keyword={}): {}", page, keyword, e.getMessage());
         }
 
-        log.info("JSearch: fetched {} jobs for keyword='{}', location='{}'", results.size(), keyword, location);
+        log.info("JSearch: successfully fetched {} jobs for keyword='{}', location='{}'", results.size(), keyword, location);
         return results;
     }
 
@@ -119,6 +128,8 @@ public class JSearchJobProvider implements JobProvider {
 
         // JSearch provides structured employment type
         job.setEmploymentType(text(item, "job_employment_type")); // FULLTIME | PARTTIME | CONTRACTOR
+        job.setFetchedAt(new Date());
+        job.setIsActive(true);
 
         // Salary
         String salMin = text(item, "job_min_salary");
@@ -128,7 +139,7 @@ public class JSearchJobProvider implements JobProvider {
             job.setSalary(salMin + " – " + salMax + (salPeriod != null ? " (" + salPeriod + ")" : ""));
         }
 
-        // JSearch provides a highlights.Qualifications array — map to skills
+        // JSearch provides highlights.Qualifications array
         JsonNode highlights = item.path("job_highlights");
         JsonNode quals = highlights.path("Qualifications");
         List<String> skills = new ArrayList<>();
@@ -141,12 +152,31 @@ public class JSearchJobProvider implements JobProvider {
         job.setSkills(skills);
 
         // Posted date (epoch seconds)
+        Date postedDate = null;
         JsonNode postedTs = item.get("job_posted_at_timestamp");
         if (postedTs != null && !postedTs.isNull()) {
             try {
                 long epochSeconds = postedTs.asLong();
-                job.setPostedDate(LocalDate.ofEpochDay(epochSeconds / 86400));
+                postedDate = new Date(epochSeconds * 1000L);
             } catch (Exception ignored) {}
+        }
+        if (postedDate == null) {
+            postedDate = new Date();
+        }
+        job.setPostedAt(postedDate);
+
+        // Expiration date
+        JsonNode expTs = item.get("job_offer_expiration_timestamp");
+        if (expTs != null && !expTs.isNull()) {
+            try {
+                job.setExpiresAt(new Date(expTs.asLong() * 1000L));
+            } catch (Exception ignored) {}
+        }
+        if (job.getExpiresAt() == null) {
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(postedDate);
+            cal.add(Calendar.DAY_OF_MONTH, 30);
+            job.setExpiresAt(cal.getTime());
         }
 
         return job;

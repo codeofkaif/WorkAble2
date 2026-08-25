@@ -1,13 +1,13 @@
 package com.ai.accessibility.model;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
  * Common normalized job DTO — source-agnostic.
- * All three job providers (Jooble, Adzuna, JSearch) convert their
- * raw API responses into this model before any further processing.
+ * All job providers (Jooble, Adzuna, JSearch) normalize their responses into this model.
+ * The rest of the application (deduplicator, database, AI recommendation engine) only interacts with this model.
  */
 public class NormalizedJob {
 
@@ -18,19 +18,28 @@ public class NormalizedJob {
     private String description;
     private List<String> skills = new ArrayList<>();
     private String salary;
-    private String employmentType;  // full-time | part-time | contract | internship
-    private String source;          // "jooble" | "adzuna" | "jsearch"
-    private String sourceJobId;     // original ID from the provider
+    private String employmentType; // "full-time" | "part-time" | "contract" | "internship"
+    private String source;         // "jooble" | "adzuna" | "jsearch"
+    private String sourceJobId;    // original provider job id
     private String applyUrl;
-    private LocalDate postedDate;
+    private Date postedAt;
+    private Date fetchedAt;
+    private Date expiresAt;
+    private boolean isActive = true;
+    private Date createdAt;
+    private Date updatedAt;
 
     // ---- Constructors ----
 
-    public NormalizedJob() {}
+    public NormalizedJob() {
+        this.fetchedAt = new Date();
+        this.isActive = true;
+    }
 
     public NormalizedJob(String title, String company, String location,
                          String description, String source, String sourceJobId,
                          String applyUrl) {
+        this();
         this.title = title;
         this.company = company;
         this.location = location;
@@ -75,6 +84,21 @@ public class NormalizedJob {
     public String getApplyUrl() { return applyUrl; }
     public void setApplyUrl(String applyUrl) { this.applyUrl = applyUrl; }
 
-    public LocalDate getPostedDate() { return postedDate; }
-    public void setPostedDate(LocalDate postedDate) { this.postedDate = postedDate; }
+    public Date getPostedAt() { return postedAt; }
+    public void setPostedAt(Date postedAt) { this.postedAt = postedAt; }
+
+    public Date getFetchedAt() { return fetchedAt; }
+    public void setFetchedAt(Date fetchedAt) { this.fetchedAt = fetchedAt; }
+
+    public Date getExpiresAt() { return expiresAt; }
+    public void setExpiresAt(Date expiresAt) { this.expiresAt = expiresAt; }
+
+    public boolean isActive() { return isActive; }
+    public void setIsActive(boolean active) { isActive = active; }
+
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }
