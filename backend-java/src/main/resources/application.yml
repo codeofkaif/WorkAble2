@@ -4,7 +4,7 @@ server:
 spring:
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ai_job_accessibility}
-    username: ${POSTGRES_USER:kaifkhan}
+    username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:}
     driver-class-name: org.postgresql.Driver
   jpa:
@@ -16,7 +16,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb+srv://kaif6388:KAIFkhan6388@cluster0.rxnir.mongodb.net/ai-job-accessibility?retryWrites=true&w=majority&appName=Cluster0}
+      uri: ${MONGODB_URI:mongodb://localhost:27017/ai-job-accessibility}
   servlet:
     multipart:
       max-file-size: 15MB
@@ -24,9 +24,9 @@ spring:
 
 app:
   jwt:
-    secret: Kaifkhan638891@&
+    secret: ${JWT_SECRET:your_jwt_secret_key_change_in_production}
   gemini:
-    api-key: ${GEMINI_API_KEY:AIzaSyClsioS040Ydo1xE35FHvssQbN24CNr9f8}
+    api-key: ${GEMINI_API_KEY:}
   context-engine:
     url: ${CONTEXT_ENGINE_URL:http://127.0.0.1:8000}
     api-key: ${CONTEXT_ENGINE_API_KEY:test-api-key}

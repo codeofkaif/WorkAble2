@@ -34,13 +34,28 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Environment variables
+# Environment variables & secrets
 backend/config.env
 frontend/.env
+*.env
 .env
+.env.*
+!.env.example
+!frontend/.env.example
+
+# Python & Databases
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.db
+*.sqlite
+*.sqlite3
+context_engine.db
 
 # Build outputs
 backend-java/target/
+target/
 *.jar
 *.class
 
