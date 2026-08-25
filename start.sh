@@ -2,6 +2,14 @@
 
 echo "🚀 Starting WorkAble Platform (Spring Boot + Context Engine + React)..."
 
+# Load local environment variables from .env if present
+if [ -f .env ]; then
+  echo "📄 Loading environment variables from .env..."
+  set -a
+  source .env
+  set +a
+fi
+
 # Free up ports if previously occupied
 echo "🧹 Cleaning up any previous processes on ports 5001, 8000, 3000..."
 lsof -ti:5001,8000,3000 | xargs kill -9 2>/dev/null || true
