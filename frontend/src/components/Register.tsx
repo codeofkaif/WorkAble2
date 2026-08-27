@@ -17,7 +17,7 @@ const Register: React.FC = () => {
   const [role, setRole] = useState<'job_seeker' | 'employer'>('job_seeker');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

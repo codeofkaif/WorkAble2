@@ -5,7 +5,6 @@ import {
   Mail, 
   Phone, 
   MapPin, 
-  Clock, 
   Send,
   CheckCircle
 } from 'lucide-react';

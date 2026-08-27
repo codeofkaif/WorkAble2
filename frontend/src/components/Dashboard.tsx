@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI, DashboardData } from '../services/dashboardAPI';
 import JobSeekerDashboard from './JobSeekerDashboard';
 import EmployerDashboard from './EmployerDashboard';
@@ -15,7 +14,6 @@ import { Loader2 } from 'lucide-react';
  * Handles loading states and errors gracefully
  */
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
