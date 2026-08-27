@@ -1,31 +1,58 @@
 services:
+  # 1. Java Spring Boot Backend Service
   - type: web
-    name: ai-job-accessibility-backend
-    runtime: node
-    rootDir: backend
+    name: workable-backend
+    env: docker
+    dockerContext: backend-java
+    dockerfilePath: backend-java/Dockerfile
     plan: free
-    buildCommand: npm install
-    startCommand: npm start
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: PORT
         value: 10000
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: workable-postgres
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: workable-postgres
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: workable-postgres
+          property: password
       - key: MONGODB_URI
         sync: false
+        # Example: mongodb+srv://<user>:<password>@cluster0.mongodb.net/ai-job-accessibility?retryWrites=true&w=majority
       - key: JWT_SECRET
-        sync: false
+        generateValue: true
       - key: GEMINI_API_KEY
         sync: false
-      - key: GEMINI_MODEL
-        value: gemini-1.5-flash
+      - key: CONTEXT_ENGINE_URL
+        value: http://localhost:8000
+      - key: JOB_SYNC_ENABLED
+        value: "true"
 
-  - type: static
-    name: ai-job-accessibility-frontend
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: build
+  # 2. Python AI Context Engine Service (Optional companion service)
+  - type: web
+    name: workable-context-engine
+    env: docker
+    dockerContext: context-engine
+    dockerfilePath: context-engine/Dockerfile
+    plan: free
+    healthCheckPath: /health
     envVars:
-      - key: REACT_APP_API_URL
-        value: https://ai-job-accessibility-backend.onrender.com/api
+      - key: PORT
+        value: 8000
+      - key: ENVIRONMENT
+        value: production
+
+# Managed PostgreSQL Database on Render
+databases:
+  - name: workable-postgres
+    databaseName: ai_job_accessibility
+    user: workable_user
+    plan: free

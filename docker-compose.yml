@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database (Users, Jobs, Applications)
+  postgres:
+    image: postgres:15-alpine
+    container_name: workable-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai_job_accessibility
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_job_accessibility"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. MongoDB Database (Resumes)
+  mongodb:
+    image: mongo:7.0
+    container_name: workable-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 3. Python AI Context Engine
+  context-engine:
+    build:
+      context: ./context-engine
+      dockerfile: Dockerfile
+    container_name: workable-context-engine
+    restart: unless-stopped
+    environment:
+      - PORT=8000
+      - ENVIRONMENT=development
+    ports:
+      - "8000:8000"
+
+  # 4. Spring Boot Backend API
+  backend:
+    build:
+      context: ./backend-java
+      dockerfile: Dockerfile
+    container_name: workable-backend
+    restart: unless-stopped
+    environment:
+      - PORT=5001
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=ai_job_accessibility
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgrespassword
+      - MONGODB_URI=mongodb://mongodb:27017/ai-job-accessibility
+      - CONTEXT_ENGINE_URL=http://context-engine:8000
+      - JWT_SECRET=${JWT_SECRET:-workable_secure_jwt_token_secret_key_2026}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      context-engine:
+        condition: service_started
+
+  # 5. React Frontend Served with Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=http://localhost:5001/api
+    container_name: workable-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  mongo_data:

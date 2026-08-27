@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ai_job_accessibility}
-    username: ${POSTGRES_USER:postgres}
-    password: ${POSTGRES_PASSWORD:}
+    url: ${SPRING_DATASOURCE_URL:${DATABASE_URL:jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ai_job_accessibility}}}
+    username: ${SPRING_DATASOURCE_USERNAME:${POSTGRES_USER:postgres}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${POSTGRES_PASSWORD:}}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:

@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "description": "AI-powered platform for job accessibility for disabled persons",
   "scripts": {
-    "install:all": "cd backend && npm install && cd ../frontend && npm install",
-    "start:backend": "cd backend && npm start",
+    "install:frontend": "cd frontend && npm install",
+    "start:backend": "cd backend-java && mvn spring-boot:run",
     "start:frontend": "cd frontend && npm start",
-    "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
-    "build": "cd frontend && npm run build"
+    "build:backend": "cd backend-java && mvn clean package -DskipTests",
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "build": "cd frontend && npm install && npm run build",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
   },
   "keywords": [
     "accessibility",

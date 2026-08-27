@@ -33,8 +33,10 @@ api.interceptors.response.use(
     } else if (!error.response) {
       // Network error - backend server is not running or wrong port
       // Don't clear token if it's just a network error (server might be temporarily down)
-      const backendPort = '5001';
-      error.message = `Network error. Please check if the backend server is running on port ${backendPort}. Current API URL: ${process.env.REACT_APP_API_URL || '/api (using proxy to port 5001)'}`;
+      const isDev = process.env.NODE_ENV === 'development';
+      error.message = isDev
+        ? `Network error. Please check if the backend server is running on port 5001. Current API URL: ${process.env.REACT_APP_API_URL || '/api (using proxy to port 5001)'}`
+        : 'Unable to connect to the backend server. Please check your connection or try again shortly.';
       error.isNetworkError = true; // Flag to identify network errors
       // Keep token safe - don't clear it on network errors
     } else if (error.response.status === 401) {
