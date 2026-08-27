@@ -36,32 +36,38 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.code === 'ECONNABORTED') {
+    const serverMessage = error.response?.data?.message || error.response?.data?.error;
+
+    if (serverMessage && typeof serverMessage === 'string') {
+      error.message = serverMessage;
+    } else if (error.code === 'ECONNABORTED') {
       error.message = 'Request timeout. Please try again.';
     } else if (!error.response) {
       // Network error - backend server is not running or wrong port
-      // Don't clear token if it's just a network error (server might be temporarily down)
       const isDev = process.env.NODE_ENV === 'development';
       error.message = isDev
-        ? `Network error. Please check if the backend server is running on port 5001. Current API URL: ${process.env.REACT_APP_API_URL || '/api (using proxy to port 5001)'}`
-        : 'Unable to connect to the backend server. Please check your connection or try again shortly.';
-      error.isNetworkError = true; // Flag to identify network errors
-      // Keep token safe - don't clear it on network errors
+        ? `Network error. Please check if the backend server is running. Current API URL: ${process.env.REACT_APP_API_URL || '/api'}`
+        : 'Unable to connect to the backend server. Please check your internet connection or try again shortly.';
+      error.isNetworkError = true;
+    } else if (error.response.status === 400) {
+      error.message = serverMessage || 'Invalid request. Please check the entered details and try again.';
     } else if (error.response.status === 401) {
       // Handle 401 Unauthorized - only clear token if it's actually invalid
       const token = localStorage.getItem('token');
       if (token) {
-        // Only clear token if we get a 401 response (server says token is invalid)
-        // This means server is running but token is bad
         localStorage.removeItem('token');
-        
-        // Only redirect if we're not already on login/register page
         const currentPath = window.location.pathname;
         if (currentPath !== '/login' && currentPath !== '/register') {
           const nextUrl = encodeURIComponent(currentPath);
           window.location.href = `/login?next=${nextUrl}`;
         }
       }
+    } else if (error.response.status === 403) {
+      error.message = serverMessage || 'You do not have permission to perform this action.';
+    } else if (error.response.status === 404) {
+      error.message = serverMessage || 'Resource not found.';
+    } else if (error.response.status >= 500) {
+      error.message = serverMessage || 'Server error. Please try again in a few moments.';
     }
     return Promise.reject(error);
   }
