@@ -1,7 +1,15 @@
 import axios from 'axios';
 
+const getBaseUrl = (): string => {
+  let url = (process.env.REACT_APP_API_URL || '/api').trim();
+  if (url.startsWith('http') && !url.includes('/api')) {
+    url = `${url.replace(/\/+$/, '')}/api`;
+  }
+  return url;
+};
+
 export const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '/api',
+  baseURL: getBaseUrl(),
   headers: {
     'Content-Type': 'application/json'
   },
